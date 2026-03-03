@@ -34,113 +34,119 @@ bist_100_full = {
 }
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
-# --- 3. OTURUM YÖNETİMİ ---
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-# --- 4. VERİ FONKSİYONLARI ---
-def veri_cek(ticker, periyot="1y", aralik="1d"):
+# --- 3. VERİ FONKSİYONU ---
+def veri_indir_guvenli(tickers, period="1y", interval="1d"):
     try:
-        data = yf.download(ticker, period=periyot, interval=aralik, progress=False)
+        data = yf.download(tickers, period=period, interval=interval, progress=False)
         if data.empty: return None
-        return data['Close'][ticker] if isinstance(data.columns, pd.MultiIndex) else data['Close']
+        return data['Close'] if 'Close' in data else data
     except: return None
 
-# --- 5. ÜST PANEL (TEKNİK ANALİZ) ---
+# --- 4. ARAYÜZ BAŞLANGIÇ ---
 st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
+# --- 5. TEKNİK ANALİZ GRAFİĞİ ---
 st.header("🔍 Hisse Teknik Analizi")
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
-    teknik_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
-    t_kod = teknik_secim.split(" - ")[0]
-    sure_secimi = st.radio("Süre:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
+    ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
+    t_kod = ana_secim.split(" - ")[0]
+    t_sure = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
 
-periyot_map = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
-aralik_map = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
+t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
+t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
 
-hisse_fiyatlari = veri_cek(f"{t_kod}.IS", periyot_map[sure_secimi], aralik_map[sure_secimi])
+hisse_fiyat = veri_indir_guvenli(f"{t_kod}.IS", t_periyot[t_sure], t_aralik[t_sure])
 
-if hisse_fiyatlari is not None:
-    fig = go.Figure(data=[go.Scatter(x=hisse_fiyatlari.index, y=hisse_fiyatlari, line=dict(color='#00d1b2'))])
-    fig.update_layout(template="plotly_white", height=400, margin=dict(l=20, r=20, t=30, b=20))
-    st.plotly_chart(fig, use_container_width=True)
+if hisse_fiyat is not None:
+    fig_raw = go.Figure(data=[go.Scatter(x=hisse_fiyat.index, y=hisse_fiyat, line=dict(color='#00d1b2', width=2))])
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
+    st.plotly_chart(fig_raw, use_container_width=True)
 
-# --- 6. PÖRTFÖY YÖNETİMİ (RENKLİ ANALİZ) ---
+# --- 6. KIYASLAMA BÖLÜMÜ (GERİ EKLENDİ) ---
 st.divider()
-st.header("💰 Pörtföyüm & Kar-Zarar Takibi")
+st.header("📊 Karşılaştırmalı Performans (Normalize 100)")
+kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"], key="kiyas_ms")
 
-# Hisse Ekleme Alanı
+# Kıyaslama için verileri çek
+indir_list = [f"{t_kod}.IS"]
+if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
+if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
+
+veriler_kiyas = veri_indir_guvenli(indir_list, period="1y")
+
+if veriler_kiyas is not None:
+    fig_norm = go.Figure()
+    
+    # Yardımcı Çizim
+    def ciz_norm(ticker, label, color=None):
+        series = veriler_kiyas[ticker].dropna() if isinstance(veriler_kiyas, pd.DataFrame) else veriler_kiyas.dropna()
+        if not series.empty:
+            fig_norm.add_trace(go.Scatter(x=series.index, y=(series/series.iloc[0])*100, name=label, line=dict(color=color)))
+
+    # Ana Hisse
+    ciz_norm(f"{t_kod}.IS" if isinstance(veriler_kiyas, pd.DataFrame) else None, t_kod, "#1f77b4")
+    
+    # Altın/Gümüş
+    if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler_kiyas.columns:
+        ciz_norm("GC=F", "Altın (Ons)", "gold")
+    if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler_kiyas.columns:
+        ciz_norm("SI=F", "Gümüş (Ons)", "silver")
+    
+    # Enflasyon
+    if "Enflasyon (%65)" in kiyas_secenek:
+        h_idx = veriler_kiyas.index
+        fig_norm.add_trace(go.Scatter(x=h_idx, y=[100*(1+0.65*(i/len(h_idx))) for i in range(len(h_idx))], 
+                                     name="Enflasyon", line=dict(dash='dash', color='red')))
+    
+    fig_norm.update_layout(template="plotly_white", height=450, yaxis_title="Getiri Endeksi (100)")
+    st.plotly_chart(fig_norm, use_container_width=True)
+
+# --- 7. PÖRTFÖY YÖNETİMİ ---
+st.divider()
+st.header("💰 Pörtföyüm & Kar-Zarar")
+
 with st.expander("➕ Yeni Hisse Ekle", expanded=True):
     e1, e2, e3 = st.columns([2, 1, 1])
-    with e1: p_hisse = st.selectbox("Hisse Seçiniz:", hisse_listesi, key="p_ekle")
-    with e2: p_maliyet = st.number_input("Alış Fiyatı (TL):", min_value=0.01, format="%.2f")
+    with e1: p_hisse = st.selectbox("Hisse:", hisse_listesi, key="p_ek")
+    with e2: p_maliyet = st.number_input("Maliyet:", min_value=0.01, format="%.2f")
     with e3: p_adet = st.number_input("Adet:", min_value=1, step=1)
-    
-    if st.button("Pörtföye Kaydet", use_container_width=True):
+    if st.button("Pörtföye Ekle", use_container_width=True):
         pkod = p_hisse.split(" - ")[0]
-        yeni_satir = pd.DataFrame([{'Hisse': pkod, 'Maliyet': p_maliyet, 'Adet': p_adet}])
-        st.session_state.portfoy = pd.concat([st.session_state.portfoy, yeni_satir], ignore_index=True)
+        st.session_state.portfoy = pd.concat([st.session_state.portfoy, 
+                                              pd.DataFrame([{'Hisse': pkod, 'Maliyet': p_maliyet, 'Adet': p_adet}])], 
+                                             ignore_index=True)
         st.rerun()
 
-# Pörtföy Listeleme ve Hesaplama
 if not st.session_state.portfoy.empty:
-    toplam_maliyet = 0.0
-    toplam_guncel_deger = 0.0
-
-    st.subheader("Aktif Pozisyonlar")
-    
-    # Başlıklar
-    h1, h2, h3, h4, h5, h6 = st.columns([1, 1, 1, 1.5, 1, 0.5])
-    h1.write("**Hisse**")
-    h2.write("**Maliyet**")
-    h3.write("**Güncel**")
-    h4.write("**K/Z Durumu**")
-    h5.write("**Toplam Değer**")
-    h6.write("")
-
+    t_maliyet, t_guncel = 0.0, 0.0
     for idx, row in st.session_state.portfoy.iterrows():
-        # Güncel fiyatı çek
-        guncel_veri = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
-        if not guncel_veri.empty:
-            guncel_f = float(guncel_veri['Close'].iloc[-1])
-            maliyet_toplam = row['Maliyet'] * row['Adet']
-            guncel_toplam = guncel_f * row['Adet']
-            kz_tl = guncel_toplam - maliyet_toplam
-            kz_yuzde = (kz_tl / maliyet_toplam) * 100
-            
-            toplam_maliyet += maliyet_toplam
-            toplam_guncel_deger += guncel_toplam
+        g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
+        if not g_veri.empty:
+            g_fiyat = float(g_veri['Close'].iloc[-1])
+            m_toplam = row['Maliyet'] * row['Adet']
+            g_toplam = g_fiyat * row['Adet']
+            kz_tl = g_toplam - m_toplam
+            t_maliyet += m_toplam
+            t_guncel += g_toplam
 
-            # Renk belirleme
             renk = "green" if kz_tl >= 0 else "red"
-            isaret = "+" if kz_tl >= 0 else ""
-
-            # Satır Çizimi
-            c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1.5, 1, 0.5])
+            c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 2, 0.5])
             c1.write(f"**{row['Hisse']}**")
-            c2.write(f"{row['Maliyet']:.2f} TL")
-            c3.write(f"{guncel_f:.2f} TL")
-            c4.markdown(f":{renk}[{isaret}{kz_tl:,.2f} TL ({isaret}{kz_yuzde:.2f}%)]")
-            c5.write(f"{guncel_toplam:,.2f} TL")
-            if c6.button("🗑️", key=f"sil_{idx}"):
+            c2.write(f"{row['Maliyet']:.2f}")
+            c3.write(f"{g_fiyat:.2f}")
+            c4.markdown(f":{renk}[{kz_tl:,.2f} TL (%{ (kz_tl/m_toplam)*100 :.2f})]")
+            if c5.button("🗑️", key=f"s_{idx}"):
                 st.session_state.portfoy = st.session_state.portfoy.drop(idx).reset_index(drop=True)
                 st.rerun()
 
-    # --- EN ALTTA GENEL ÖZET (METRİKLER) ---
     st.divider()
-    genel_kz = toplam_guncel_deger - toplam_maliyet
-    genel_yuzde = (genel_kz / toplam_maliyet * 100) if toplam_maliyet > 0 else 0
-    
     m1, m2, m3 = st.columns(3)
-    m1.metric("Toplam Yatırım", f"{toplam_maliyet:,.2f} TL")
-    m2.metric("Pörtföy Değeri", f"{toplam_guncel_deger:,.2f} TL")
-    m3.metric("Toplam Kar / Zarar", 
-              f"{genel_kz:,.2f} TL", 
-              delta=f"{genel_yuzde:.2f}%",
-              delta_color="normal") # Kendi rengini otomatik ayarlar (Pozitif yeşil, negatif kırmızı)
-
-else:
-    st.info("Pörtföyünüz henüz boş. Yukarıdaki formu kullanarak hisse ekleyebilirsiniz.")
+    m1.metric("Toplam Yatırım", f"{t_maliyet:,.2f} TL")
+    m2.metric("Güncel Değer", f"{t_guncel:,.2f} TL")
+    m3.metric("Net Kar/Zarar", f"{t_guncel - t_maliyet:,.2f} TL", delta=f"{((t_guncel/t_maliyet)-1)*100:.2f}%")
