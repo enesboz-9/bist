@@ -51,7 +51,7 @@ st.divider()
 
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
-    ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
+    ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=35) # GARAN varsayılan
     t_kod = ana_secim.split(" - ")[0]
     t_sure_etiket = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
 
@@ -72,7 +72,7 @@ if h_fiyat_raw is not None:
 
 # --- KIYASLAMA (HATA KORUMALI) ---
 st.divider()
-st.header(f"📊 TL Bazlı Performans - {t_sure_etiket}")
+st.header(f"📊 TL Bazlı Performans Kıyaslaması - {t_sure_etiket}")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
 indir_list = [f"{t_kod}.IS", "USDTRY=X"]
@@ -81,7 +81,6 @@ if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
 
 veriler = veri_indir_guvenli(indir_list, period=secilen_periyot)
 
-# Ana veri kontrolü
 if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" in veriler.columns:
     veriler = veriler.ffill().dropna()
     
@@ -93,13 +92,18 @@ if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" i
         h_seri = veriler[f"{t_kod}.IS"]
         fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
 
+        # Tablo verisi için liste
+        ozet_veriler = [{"Varlık": f"{t_kod} (Hisse)", "Bugünkü Değer (TL)": f"{(h_seri.iloc[-1]/h_seri.iloc[0])*100:.2f} TL"}]
+
         if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler.columns:
             altin_tl = veriler["GC=F"] * kur
             fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
+            ozet_veriler.append({"Varlık": "Altın (TL)", "Bugünkü Değer (TL)": f"{(altin_tl.iloc[-1]/altin_tl.iloc[0])*100:.2f} TL"})
 
         if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler.columns:
             gumus_tl = veriler["SI=F"] * kur
             fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
+            ozet_veriler.append({"Varlık": "Gümüş (TL)", "Bugünkü Değer (TL)": f"{(gumus_tl.iloc[-1]/gumus_tl.iloc[0])*100:.2f} TL"})
 
         if "Enflasyon" in kiyas_secenek:
             enf_oranlari = {2020: 0.14, 2021: 0.19, 2022: 0.72, 2023: 0.65, 2024: 0.55, 2025: 0.45, 2026: 0.35}
@@ -112,13 +116,20 @@ if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" i
                 current_val *= gunluk_artis
                 cumulative_enf.append(current_val)
             fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
+            ozet_veriler.append({"Varlık": "Enflasyon Karşılığı (Erişim Gereken)", "Bugünkü Değer (TL)": f"{cumulative_enf[-1]:.2f} TL"})
 
-        fig_norm.update_layout(template="plotly_white", height=500, yaxis_title="Getiri Endeksi (100)")
         st.plotly_chart(fig_norm, use_container_width=True)
+
+        # --- YENİ EKLENEN ÖZET TABLO ---
+        st.subheader(f"💰 100 TL Yatırımın Bugündeki Karşılığı ({t_sure_etiket} Önce)")
+        st.table(pd.DataFrame(ozet_veriler))
+        if "Enflasyon" in kiyas_secenek:
+            st.caption(f"*Enflasyon Karşılığı: Seçilen tarihteki 100 TL'nin bugün aynı alım gücüne sahip olması için gereken miktar.*")
+
     else:
-        st.warning(f"{t_kod} için bu tarih aralığında yeterli veri yok. Lütfen süreyi kısaltmayı deneyin.")
+        st.warning(f"{t_kod} için bu tarih aralığında yeterli veri yok.")
 else:
-    st.info("Kıyaslama verileri hazırlanıyor veya seçilen hisse için veri çekilemiyor.")
+    st.info("Veriler hazırlanıyor...")
 
 # --- PÖRTFÖY YÖNETİMİ ---
 st.divider()
