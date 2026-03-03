@@ -14,24 +14,14 @@ if 'portfoy' not in st.session_state:
 @st.cache_data(ttl=300)
 def veri_cek_garanti(ticker):
     try:
-        # Veriyi indir ve sadece kapanış sütununu al
         data = yf.download(ticker, period="1y", interval="1d", progress=False)
         if data.empty:
             return None
-        # Multi-index yapısını düzleştir
         if isinstance(data.columns, pd.MultiIndex):
             return data['Close'][ticker]
         return data['Close']
     except:
         return None
-
-def rsi_hesapla(series, window=14):
-    if series is None or len(series) < window: return 50.0
-    delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-    rs = gain / loss
-    return float(100 - (100 / (1 + rs)).iloc[-1])
 
 # --- 4. ARAYÜZ BAŞLIĞI ---
 st.title("📈 BIST Stratejik Analiz Paneli")
@@ -42,7 +32,7 @@ st.divider()
 st.header("💰 Portföy Yönetimi")
 c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
 
-with c1: h_input = st.text_input("Hisse Kodu (Örn: THYAO)", "THYAO").upper()
+with c1: h_input = st.text_input("Hisse Kodu Ekle (Örn: THYAO)", "THYAO").upper()
 with c2: m_input = st.number_input("Maliyet", min_value=0.0, step=0.01)
 with c3: a_input = st.number_input("Adet", min_value=0, step=1)
 with c4:
@@ -51,19 +41,15 @@ with c4:
         new_row = pd.DataFrame([{'Hisse': h_input, 'Maliyet': m_input, 'Adet': a_input}])
         st.session_state.portfoy = pd.concat([st.session_state.portfoy, new_row], ignore_index=True)
 
-# Portföy Hesaplamaları
 toplam_m, toplam_d = 0.0, 0.0
-
 if not st.session_state.portfoy.empty:
     for idx, row in st.session_state.portfoy.iterrows():
         fiyatlar = veri_cek_garanti(f"{row['Hisse']}.IS")
         if fiyatlar is not None:
             guncel_f = float(fiyatlar.iloc[-1])
-            h_m = float(row['Maliyet'] * row['Adet'])
-            h_d = float(guncel_f * row['Adet'])
+            h_m, h_d = float(row['Maliyet'] * row['Adet']), float(guncel_f * row['Adet'])
             toplam_m += h_m
             toplam_d += h_d
-            
             p_col = st.columns([1, 1, 1, 1])
             p_col[0].write(f"**{row['Hisse']}**")
             p_col[1].write(f"{row['Adet']} Adet")
@@ -71,47 +57,55 @@ if not st.session_state.portfoy.empty:
             if p_col[3].button("Sil", key=f"btn_{idx}"):
                 st.session_state.portfoy = st.session_state.portfoy.drop(idx).reset_index(drop=True)
                 st.rerun()
+    st.info(f"Toplam Portföy Değeri: {toplam_d:,.2f} TL | Toplam K/Z: {toplam_d - toplam_m:,.2f} TL")
 
-    st.divider()
-    m_col1, m_col2 = st.columns(2)
-    m_col1.metric("Toplam Portföy Değeri", f"{toplam_d:,.2f} TL")
-    m_col2.metric("Toplam Kar/Zarar", f"{toplam_d - toplam_m:,.2f} TL", 
-                  delta=f"{((toplam_d/toplam_m)-1)*100:.2f}%" if toplam_m > 0 else "0%")
+# --- 6. BAĞIMSIZ KARŞILAŞTIRMA GRAFİĞİ ---
+st.divider()
+st.header("📊 Karşılaştırmalı Grafik Analizi")
+st.write("Seçtiğiniz varlıkların son 1 yıllık performansını başlangıç noktasını (100) eşitleyerek kıyaslar.")
 
-# --- 6. KIYASLAMA VE GRAFİK ---
-st.header("📊 Karşılaştırmalı Grafik")
-secenekler = st.multiselect("Ekle:", ["Altın", "Gümüş", "Enflasyon"])
+g_col1, g_col2 = st.columns([1, 2])
+with g_col1:
+    grafik_hisse = st.text_input("Kıyaslanacak Hisse Kodu (Örn: EREGL, ASELS)", "THYAO").upper()
+    kiyas_secenek = st.multiselect("Yanına Ekle:", ["Altın (Gram)", "Gümüş (Gram)", "Enflasyon (%65)"])
 
-h_fiyat = veri_cek_garanti(f"{h_input}.IS")
+# Grafik Çizimi
+h_fiyat = veri_cek_garanti(f"{grafik_hisse}.IS")
 if h_fiyat is not None:
     fig = go.Figure()
-    # Normalize Et
+    # Normalize Et (İlk gün değerini 100 yap)
     h_norm = (h_fiyat / h_fiyat.iloc[0]) * 100
-    fig.add_trace(go.Scatter(x=h_norm.index, y=h_norm, name=f"{h_input}"))
+    fig.add_trace(go.Scatter(x=h_norm.index, y=h_norm, name=f"{grafik_hisse}", line=dict(width=3)))
 
-    if "Altın" in secenekler:
-        a_f = veri_cek_garanti("GC=F")
+    if "Altın (Gram)" in kiyas_secenek:
+        # GAU=X genellikle Gram Altın/TL simülasyonu için kullanılır
+        a_f = veri_cek_garanti("GAU=X")
         if a_f is not None:
             a_n = (a_f / a_f.iloc[0]) * 100
-            fig.add_trace(go.Scatter(x=a_n.index, y=a_n, name="Altın", line=dict(color='gold')))
+            fig.add_trace(go.Scatter(x=a_n.index, y=a_n, name="Altın (Gram)", line=dict(color='gold')))
 
-    if "Enflasyon" in secenekler:
+    if "Gümüş (Gram)" in kiyas_secenek:
+        g_f = veri_cek_garanti("XAGUSD=X") # Gümüş Ons takibi üzerinden TL simülasyonu
+        if g_f is not None:
+            g_n = (g_f / g_f.iloc[0]) * 100
+            fig.add_trace(go.Scatter(x=g_n.index, y=g_n, name="Gümüş", line=dict(color='silver')))
+
+    if "Enflasyon (%65)" in kiyas_secenek:
         enf = [100 * (1 + 0.65 * (i/len(h_norm))) for i in range(len(h_norm))]
-        fig.add_trace(go.Scatter(x=h_norm.index, y=enf, name="Enflasyon (%65)", line=dict(dash='dash', color='red')))
+        fig.add_trace(go.Scatter(x=h_norm.index, y=enf, name="Yıllık Enflasyon Trendi", line=dict(dash='dash', color='red')))
 
+    fig.update_layout(
+        title=f"{grafik_hisse} vs Diğer Yatırım Araçları",
+        xaxis_title="Tarih",
+        yaxis_title="Getiri Endeksi (Başlangıç = 100)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        template="plotly_white",
+        height=600
+    )
     st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning(f"{grafik_hisse} için veri çekilemedi. Lütfen kodu doğru yazdığınızdan emin olun.")
 
-# --- 7. SİNYALLER ---
-st.header("🎯 Al-Sat Sinyalleri")
-if st.button("Analiz Et"):
-    zamanlar = {"15 Dakika": "15m", "1 Saat": "1h", "1 Gün": "1d"}
-    s_cols = st.columns(3)
-    for i, (label, interval) in enumerate(zamanlar.items()):
-        p = "5d" if "m" in interval else "1mo"
-        data_s = yf.download(f"{h_input}.IS", period=p, interval=interval, progress=False)
-        if not data_s.empty:
-            # Multi-index düzeltme
-            close_s = data_s['Close'][f"{h_input}.IS"] if isinstance(data_s.columns, pd.MultiIndex) else data_s['Close']
-            r = rsi_hesapla(close_s)
-            txt = "🟢 AL" if r < 35 else "🔴 SAT" if r > 65 else "🟡 BEKLE"
-            s_cols[i].metric(label, txt, delta=f"RSI: {r:.1f}")
+# --- 7. ALT BİLGİ ---
+st.divider()
+st.caption("Veriler yfinance kütüphanesi üzerinden çekilmektedir ve 15 dakika gecikmeli olabilir.")
