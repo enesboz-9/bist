@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 
 # --- 1. SAYFA AYARLARI ---
@@ -26,7 +27,7 @@ bist_100_full = {
     "OYAKC": "Oyak Çimento", "PENTA": "Penta Teknoloji", "PETKM": "Petkim", "PGSUS": "Pegasus",
     "QUAGR": "Qua Granite", "SAHOL": "Sabancı Holding", "SASA": "Sasa Polyester", "SAYAS": "Say Yenilenebilir Enerji",
     "SDTTR": "Sdt Uzay Ve Savunma", "SISE": "Şişecam", "SKBNK": "Şekerbank", "SMRTG": "Smart Güneş Enerjisi",
-    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Kuruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
+    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Koruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
     "THYAO": "Türk Hava Yolları", "TKFEN": "Tekfen Holding", "TOASO": "Tofaş Oto. Fab.", "TSKB": "Tskb",
     "TTKOM": "Türk Telekom", "TTRAK": "Türk Traktör", "TUPRS": "Tüpraş", "TURSG": "Türkiye Sigorta",
     "ULKER": "Ülker Bisküvi", "VAKBN": "Vakıfbank", "VESBE": "Vestel Beyaz Eşya", "VESTL": "Vestel",
@@ -43,8 +44,7 @@ def veri_indir_guvenli(tickers, period="1y", interval="1d"):
         data = yf.download(tickers, period=period, interval=interval, progress=False)
         if data.empty: return None
         if isinstance(data.columns, pd.MultiIndex):
-            if 'Close' in data.columns:
-                return data['Close']
+            return data['Close'].ffill() # Eksik verileri tamamla (Hafta sonu/Tatil senkronu için)
         return data['Close'] if 'Close' in data else data
     except:
         return None
@@ -72,21 +72,20 @@ hisse_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", secilen_periyot, secilen_ara
 
 if hisse_fiyat_raw is not None:
     if isinstance(hisse_fiyat_raw, pd.DataFrame):
-        hisse_fiyat = hisse_fiyat_raw[f"{t_kod}.IS"] if f"{t_kod}.IS" in hisse_fiyat_raw.columns else hisse_fiyat_raw.iloc[:, 0]
+        h_fiyat = hisse_fiyat_raw[f"{t_kod}.IS"] if f"{t_kod}.IS" in hisse_fiyat_raw.columns else hisse_fiyat_raw.iloc[:, 0]
     else:
-        hisse_fiyat = hisse_fiyat_raw
+        h_fiyat = hisse_fiyat_raw
 
-    fig_raw = go.Figure(data=[go.Scatter(x=hisse_fiyat.index, y=hisse_fiyat, line=dict(color='#00d1b2', width=2))])
-    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri ({t_sure_etiket})", template="plotly_white", height=400, yaxis_title="Fiyat (TL)")
+    fig_raw = go.Figure(data=[go.Scatter(x=h_fiyat.index, y=h_fiyat, line=dict(color='#00d1b2', width=2))])
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri ({t_sure_etiket})", template="plotly_white", height=400)
     st.plotly_chart(fig_raw, use_container_width=True)
-else:
-    st.error("Veri çekilemedi.")
 
-# --- 7. KIYASLAMA BÖLÜMÜ ---
+# --- 7. KIYASLAMA BÖLÜMÜ (DÜZELTİLDİ) ---
 st.divider()
 st.header(f"📊 Karşılaştırmalı Performans - {t_sure_etiket}")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
+# Senkronize veri çekme
 indir_list = [f"{t_kod}.IS"]
 if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
 if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
@@ -94,36 +93,46 @@ if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
 veriler_kiyas = veri_indir_guvenli(indir_list, period=secilen_periyot)
 
 if veriler_kiyas is not None:
+    # Verileri ortak bir indexte birleştir ve eksikleri doldur
+    veriler_kiyas = veriler_kiyas.ffill().dropna()
     fig_norm = go.Figure()
     
-    def ciz_norm(ticker, label, color=None):
+    # Normalize çizim
+    def ciz_norm(ticker, label, color):
         if isinstance(veriler_kiyas, pd.DataFrame):
-            series = veriler_kiyas[ticker].dropna() if ticker in veriler_kiyas.columns else None
+            col = ticker if ticker in veriler_kiyas.columns else veriler_kiyas.columns[0]
+            series = veriler_kiyas[col]
         else:
-            series = veriler_kiyas.dropna()
+            series = veriler_kiyas
         
-        if series is not None and not series.empty:
-            fig_norm.add_trace(go.Scatter(x=series.index, y=(series/series.iloc[0])*100, name=label, line=dict(color=color)))
+        y_vals = (series / series.iloc[0]) * 100
+        fig_norm.add_trace(go.Scatter(x=series.index, y=y_vals, name=label, line=dict(color=color)))
 
     ciz_norm(f"{t_kod}.IS", t_kod, "#1f77b4")
+    
     if "Altın (Ons)" in kiyas_secenek: ciz_norm("GC=F", "Altın (Ons)", "gold")
-    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("SI=F", "Gümüş (Ons)", "silver") # Hata burada düzeltildi
+    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("SI=F", "Gümüş (Ons)", "silver")
     
     if "Enflasyon" in kiyas_secenek:
+        # Dinamik Enflasyon Hesaplama (TÜİK Bileşik Faiz Mantığı)
         h_idx = veriler_kiyas.index
-        fig_norm.add_trace(go.Scatter(x=h_idx, y=[100*(1+0.65*(i/len(h_idx))) for i in range(len(h_idx))], 
-                                     name="Enflasyon", line=dict(dash='dash', color='red')))
+        # Yıllık %65 enflasyon varsayımı ile günlük/aylık bileşik getiri
+        yillik_enflasyon = 0.65
+        gunluk_oran = (1 + yillik_enflasyon) ** (1/252) - 1
+        enflasyon_serisi = [100 * (1 + gunluk_oran)**i for i in range(len(h_idx))]
+        
+        fig_norm.add_trace(go.Scatter(x=h_idx, y=enflasyon_serisi, name="Enflasyon (Reel)", line=dict(dash='dash', color='red')))
     
     fig_norm.update_layout(template="plotly_white", height=450, yaxis_title="Getiri Endeksi (100)")
     st.plotly_chart(fig_norm, use_container_width=True)
 
-    with st.expander("ℹ️ Bu Grafik Ne Anlatıyor?", expanded=True):
-        st.info(f"Seçilen **{t_sure_etiket}** dönemi boyunca tüm varlıklar başlangıçta 100 kabul edilmiştir.")
+    with st.expander("ℹ️ Analiz Notu", expanded=True):
+        st.info(f"Grafik başlangıcı olan **{veriler_kiyas.index[0].strftime('%d.%m.%Y')}** tarihinde 100 TL'lik yatırımın bugün ne kadar olduğu gösterilmektedir.")
 
 # --- 8. PÖRTFÖY YÖNETİMİ ---
 st.divider()
 st.header("💰 Pörtföyüm & Kar-Zarar")
-# (Geri kalan pörtföy kodları aynı şekilde devam ediyor)
+
 with st.expander("➕ Yeni Hisse Ekle", expanded=True):
     e1, e2, e3 = st.columns([2, 1, 1])
     with e1: p_hisse = st.selectbox("Hisse:", hisse_listesi, key="p_ek")
@@ -141,22 +150,15 @@ if not st.session_state.portfoy.empty:
     for idx, row in st.session_state.portfoy.iterrows():
         g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
         if not g_veri.empty:
-            if isinstance(g_veri.columns, pd.MultiIndex):
-                g_fiyat = float(g_veri['Close'][f"{row['Hisse']}.IS"].iloc[-1])
-            else:
-                g_fiyat = float(g_veri['Close'].iloc[-1])
-                
+            g_fiyat = float(g_veri['Close'].iloc[-1])
             m_toplam = row['Maliyet'] * row['Adet']
             g_toplam = g_fiyat * row['Adet']
             kz_tl = g_toplam - m_toplam
             t_maliyet += m_toplam
             t_guncel += g_toplam
-
             renk = "green" if kz_tl >= 0 else "red"
             c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 2, 0.5])
-            c1.write(f"**{row['Hisse']}**")
-            c2.write(f"{row['Maliyet']:.2f}")
-            c3.write(f"{g_fiyat:.2f}")
+            c1.write(f"**{row['Hisse']}**"); c2.write(f"{row['Maliyet']:.2f}"); c3.write(f"{g_fiyat:.2f}")
             c4.markdown(f":{renk}[{kz_tl:,.2f} TL (%{ (kz_tl/m_toplam)*100 :.2f})]")
             if c5.button("🗑️", key=f"s_{idx}"):
                 st.session_state.portfoy = st.session_state.portfoy.drop(idx).reset_index(drop=True)
