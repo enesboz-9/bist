@@ -5,17 +5,29 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="BIST Analiz - Enes Boz", layout="wide")
+st.set_page_config(page_title="BIST Analiz Terminali - Enes Boz", layout="wide")
 
-# --- PORTFÖY HAFIZASI (Session State) ---
+# --- CSS TASARIM ---
+st.markdown("""
+    <style>
+    .stMetric { background-color: #ffffff; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+    </style>
+    """, unsafe_allow_index=True)
+
+# --- OTURUM YÖNETİMİ (Portföy Kaydı) ---
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-# --- YARDIMCI FONKSİYONLAR ---
+# --- VERİ ÇEKME FONKSİYONLARI ---
 @st.cache_data(ttl=600)
-def veri_indir(ticker, period="1y", interval="1d"):
-    data = yf.download(ticker, period=period, interval=interval)
-    return data['Close']
+def veri_indir_guvenli(ticker, period="1y"):
+    try:
+        data = yf.download(ticker, period=period, progress=False)
+        if data.empty or 'Close' not in data:
+            return pd.Series()
+        return data['Close']
+    except:
+        return pd.Series()
 
 def rsi_hesapla(series, window=14):
     delta = series.diff()
@@ -24,109 +36,102 @@ def rsi_hesapla(series, window=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def sinyal_uret(ticker):
-    # Farklı zaman dilimleri için simüle edilmiş indikatör analizi
-    intervals = {"15 Dakika": "15m", "1 Saat": "1h", "1 Gün": "1d", "1 Hafta": "1wk"}
-    sinyaller = {}
-    
-    for label, period in intervals.items():
-        # Kısa vadeli periyotlar için sınırlı veri çekilir
-        hist = yf.download(ticker, period="5d" if "m" in period else "1y", interval=period, progress=False)
-        if len(hist) > 20:
-            close = hist['Close'].iloc[-1]
-            sma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-            rsi = rsi_hesapla(hist['Close']).iloc[-1]
-            
-            if rsi < 35 and close > sma20: sinyaller[label] = "✅ GÜÇLÜ AL"
-            elif rsi < 45: sinyaller[label] = "🟢 AL"
-            elif rsi > 65: sinyaller[label] = "🔴 SAT"
-            elif rsi > 75: sinyaller[label] = "❌ GÜÇLÜ SAT"
-            else: sinyaller[label] = "🟡 BEKLE"
-        else:
-            sinyaller[label] = "Veri Yetersiz"
-    return sinyaller
+# --- ARAYÜZ ---
+st.title("📊 BIST Stratejik Analiz Terminali")
+st.markdown("### **Geliştirici:** Enes Boz")
+st.divider()
 
-# --- ANA BAŞLIK ---
-st.title("📈 BIST Stratejik Analiz Paneli")
-st.caption("Enes Boz Tarafından Geliştirildi")
+# --- 1. PORTFÖY YÖNETİMİ ---
+st.header("💰 Portföyüm")
+col_e1, col_e2, col_e3, col_e4 = st.columns([2, 1, 1, 1])
 
-# --- 1. BÖLÜM: PORTFÖY YÖNETİMİ (EKLE/SİL) ---
-st.header("💰 Portföy Yönetimi")
-c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
-
-with c1: hisse_sec = st.text_input("Hisse Kodu (Örn: THYAO)", "THYAO").upper()
-with c2: m_input = st.number_input("Maliyet", min_value=0.0)
-with c3: a_input = st.number_input("Adet", min_value=0)
-with c4: 
+with col_e1: h_input = st.text_input("Hisse Kodu (Örn: THYAO, ASELS)", "THYAO").upper()
+with col_e2: m_input = st.number_input("Alış Maliyeti", min_value=0.0, step=0.01)
+with col_e3: a_input = st.number_input("Adet", min_value=0, step=1)
+with col_e4:
     st.write("##")
-    if st.button("Hisse Ekle"):
-        yeni_satir = pd.DataFrame([{'Hisse': hisse_sec, 'Maliyet': m_input, 'Adet': a_input}])
-        st.session_state.portfoy = pd.concat([st.session_state.portfoy, yeni_satir], ignore_index=True)
+    if st.button("Portföye Ekle"):
+        new_data = pd.DataFrame([{'Hisse': h_input, 'Maliyet': m_input, 'Adet': a_input}])
+        st.session_state.portfoy = pd.concat([st.session_state.portfoy, new_data], ignore_index=True)
 
+# Portföy Listeleme ve Toplam Hesaplama
 if not st.session_state.portfoy.empty:
-    st.subheader("Mevcut Varlıklar")
-    toplam_guncel_deger = 0.0
-    toplam_maliyet = 0.0
+    st.subheader("Varlık Listesi")
+    t_maliyet, t_deger = 0.0, 0.0
     
-    for index, row in st.session_state.portfoy.iterrows():
-        try:
-            guncel_fiyat = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)['Close'].iloc[-1]
-            hisse_deger = guncel_fiyat * row['Adet']
-            hisse_maliyet = row['Maliyet'] * row['Adet']
+    for idx, row in st.session_state.portfoy.iterrows():
+        fiyat_serisi = veri_indir_guvenli(f"{row['Hisse']}.IS", period="5d")
+        if not fiyat_serisi.empty:
+            guncel_f = fiyat_serisi.iloc[-1]
+            h_maliyet = row['Maliyet'] * row['Adet']
+            h_deger = guncel_f * row['Adet']
+            t_maliyet += h_maliyet
+            t_deger += h_deger
             
-            toplam_guncel_deger += hisse_deger
-            toplam_maliyet += hisse_maliyet
-            
-            col_a, col_b, col_c, col_d = st.columns([1, 1, 1, 1])
-            col_a.write(f"**{row['Hisse']}**")
-            col_b.write(f"{row['Adet']} Adet | Maliyet: {row['Maliyet']}")
-            col_c.write(f"K/Z: {hisse_deger - hisse_maliyet:.2f} TL")
-            if col_d.button("Sil", key=f"sil_{index}"):
-                st.session_state.portfoy = st.session_state.portfoy.drop(index)
+            c_h, c_m, c_kz, c_s = st.columns([1, 1, 1, 1])
+            c_h.write(f"**{row['Hisse']}**")
+            c_m.write(f"{row['Adet']} Adet @ {row['Maliyet']:.2f}")
+            kz_tl = h_deger - h_maliyet
+            c_kz.write(f"K/Z: {kz_tl:,.2f} TL")
+            if c_s.button("Sil", key=f"del_{idx}"):
+                st.session_state.portfoy = st.session_state.portfoy.drop(idx)
                 st.rerun()
-        except: st.error(f"{row['Hisse']} verisi alınamadı.")
-
+    
     st.divider()
-    m1, m2 = st.columns(2)
-    m1.metric("Toplam Portföy Değeri", f"{toplam_guncel_deger:,.2f} TL")
-    m2.metric("Toplam Kar/Zarar", f"{toplam_guncel_deger - toplam_maliyet:,.2f} TL", 
-              delta=f"{((toplam_guncel_deger/toplam_maliyet)-1)*100:.2f}%" if toplam_maliyet > 0 else "0%")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Toplam Değer", f"{t_deger:,.2f} TL")
+    m2.metric("Toplam K/Z", f"{t_deger - t_maliyet:,.2f} TL")
+    if t_maliyet > 0:
+        m3.metric("Yüzdesel Başarı", f"%{((t_deger/t_maliyet)-1)*100:.2f}")
 
-# --- 2. BÖLÜM: AL-SAT SİNYALLERİ ---
-st.header("🎯 İndikatör Sinyalleri (RSI & SMA)")
-if st.button("Seçili Hisse İçin Sinyal Üret"):
-    sinyaller = sinyal_uret(f"{hisse_sec}.IS")
-    sc1, sc2, sc3, sc4 = st.columns(4)
-    sc1.metric("15 Dakika", sinyaller["15 Dakika"])
-    sc2.metric("1 Saat", sinyaller["1 Saat"])
-    sc3.metric("1 Gün", sinyaller["1 Gün"])
-    sc4.metric("1 Hafta", sinyaller["1 Hafta"])
+# --- 2. TEKNİK SİNYALLER ---
+st.divider()
+st.header("🎯 Çoklu Zaman Dilimi Sinyalleri")
+if st.button("İndikatörleri Analiz Et"):
+    intervals = {"15 Dakika": "15m", "1 Saat": "1h", "1 Gün": "1d"}
+    scs = st.columns(3)
+    for i, (label, period) in enumerate(intervals.items()):
+        try:
+            h = yf.download(f"{h_input}.IS", period="5d" if "m" in period else "1mo", interval=period, progress=False)
+            if not h.empty:
+                rsi_v = rsi_hesapla(h['Close']).iloc[-1]
+                if rsi_v < 30: msg = "🟢 AL"
+                elif rsi_v > 70: msg = "🔴 SAT"
+                else: msg = "🟡 BEKLE"
+                scs[i].metric(label, msg, delta=f"RSI: {rsi_v:.1f}")
+        except:
+            scs[i].write(f"{label}: Veri Hatası")
 
-# --- 3. BÖLÜM: KIYASLAMALI GRAFİK ---
-st.header("📊 Teknik Kıyaslama")
-karsilastirma = st.multiselect("Kıyaslama Varlıkları Ekleyin:", ["Altın (Gram)", "Gümüş (Gram)", "Enflasyon (TÜFE Tahmini)"])
+# --- 3. KIYASLAMA VE GRAFİK ---
+st.divider()
+st.header("📉 Karşılaştırmalı Analiz (Normalize)")
+kıyas = st.multiselect("Grafiğe Ekle:", ["Altın (Gram)", "Gümüş (Gram)", "Enflasyon (Tahmini)"])
 
-hisse_kapanis = veri_indir(f"{hisse_sec}.IS")
-# Normalizasyon (Başlangıç noktasını 100 yapma)
-hisse_norm = (hisse_kapanis / hisse_kapanis.iloc[0]) * 100
+h_data = veri_indir_guvenli(f"{h_input}.IS")
+if not h_data.empty:
+    fig = go.Figure()
+    # Başlangıcı 100'e sabitle
+    h_norm = (h_data / h_data.iloc[0]) * 100
+    fig.add_trace(go.Scatter(x=h_norm.index, y=h_norm, name=f"{h_input}"))
 
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=hisse_norm.index, y=hisse_norm, name=f"{hisse_sec} (Normalize)"))
+    if "Altın (Gram)" in kıyas:
+        a_data = veri_indir_guvenli("GAU=X") # Altın/USD yaklaşık takibi
+        if not a_data.empty:
+            a_norm = (a_data / a_data.iloc[0]) * 100
+            fig.add_trace(go.Scatter(x=a_norm.index, y=a_norm, name="Altın", line=dict(color='gold')))
 
-if "Altın (Gram)" in karsilastirma:
-    altin = veri_indir("GAU=X") # Gram Altın / USD benzeri veya XAUUSD üzerinden simüle
-    altin_norm = (altin / altin.iloc[0]) * 100
-    fig.add_trace(go.Scatter(x=altin_norm.index, y=altin_norm, name="Altın", line=dict(color='gold')))
+    if "Gümüş (Gram)" in kıyas:
+        g_data = veri_indir_guvenli("XAGUSD=X")
+        if not g_data.empty:
+            g_norm = (g_data / g_data.iloc[0]) * 100
+            fig.add_trace(go.Scatter(x=g_norm.index, y=g_norm, name="Gümüş", line=dict(color='silver')))
 
-if "Gümüş (Gram)" in karsilastirma:
-    gumus = veri_indir("XAGUSD=X")
-    gumus_norm = (gumus / gumus.iloc[0]) * 100
-    fig.add_trace(go.Scatter(x=gumus_norm.index, y=gumus_norm, name="Gümüş", line=dict(color='silver')))
+    if "Enflasyon (Tahmini)" in kıyas:
+        # Türkiye yıllık enflasyon trend simülasyonu (Yaklaşık %65)
+        enf = [100 * (1 + 0.65 * (i/len(h_norm))) for i in range(len(h_norm))]
+        fig.add_trace(go.Scatter(x=h_norm.index, y=enf, name="Enflasyon Trendi", line=dict(dash='dash', color='red')))
 
-if "Enflasyon (TÜFE Tahmini)" in karsilastirma:
-    # Yıllık %65 enflasyon varsayımı ile doğrusal grafik
-    enf_cizgi = [100 * (1 + 0.65 * (i/len(hisse_norm))) for i in range(len(hisse_norm))]
-    fig.add_trace(go.Scatter(x=hisse_norm.index, y=enf_cizgi, name="Yıllık Enflasyon Trendi", line=dict(dash='dash', color='red')))
-
-st.plotly_chart(fig, use_container_width=True)
-st.info("Grafikteki tüm varlıklar, karşılaştırma yapabilmeniz için başlangıç tarihinde 100 değerine eşitlenmiştir (Normalize).")
+    fig.update_layout(template="plotly_white", height=600, yaxis_title="Getiri Endeksi (Başlangıç=100)")
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("Hisse verisi çekilemedi. Lütfen sembolü kontrol edin.")
