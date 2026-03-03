@@ -63,11 +63,14 @@ secilen_periyot = t_periyot[t_sure_etiket]
 h_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", secilen_periyot, t_aralik[t_sure_etiket])
 if h_fiyat_raw is not None:
     seri = h_fiyat_raw[f"{t_kod}.IS"] if isinstance(h_fiyat_raw, pd.DataFrame) else h_fiyat_raw
-    fig_raw = go.Figure(data=[go.Scatter(x=seri.index, y=seri, line=dict(color='#00d1b2', width=2))])
-    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
-    st.plotly_chart(fig_raw, use_container_width=True)
+    if not seri.empty:
+        fig_raw = go.Figure(data=[go.Scatter(x=seri.index, y=seri, line=dict(color='#00d1b2', width=2))])
+        fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
+        st.plotly_chart(fig_raw, use_container_width=True)
+    else:
+        st.warning("Seçilen periyot için teknik veri bulunamadı.")
 
-# --- KIYASLAMA ---
+# --- KIYASLAMA (HATA KORUMALI) ---
 st.divider()
 st.header(f"📊 TL Bazlı Performans - {t_sure_etiket}")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
@@ -78,37 +81,44 @@ if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
 
 veriler = veri_indir_guvenli(indir_list, period=secilen_periyot)
 
-if veriler is not None and isinstance(veriler, pd.DataFrame):
+# Ana veri kontrolü
+if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" in veriler.columns:
     veriler = veriler.ffill().dropna()
-    kur = veriler["USDTRY=X"]
-    fig_norm = go.Figure()
+    
+    if not veriler.empty:
+        kur = veriler["USDTRY=X"]
+        fig_norm = go.Figure()
 
-    h_seri = veriler[f"{t_kod}.IS"]
-    fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
+        # Hisse Performansı
+        h_seri = veriler[f"{t_kod}.IS"]
+        fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
 
-    if "Altın (Ons)" in kiyas_secenek:
-        altin_tl = veriler["GC=F"] * kur
-        fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
+        if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler.columns:
+            altin_tl = veriler["GC=F"] * kur
+            fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
 
-    if "Gümüş (Ons)" in kiyas_secenek:
-        gumus_tl = veriler["SI=F"] * kur
-        fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
+        if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler.columns:
+            gumus_tl = veriler["SI=F"] * kur
+            fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
 
-    if "Enflasyon" in kiyas_secenek:
-        yillar = veriler.index.year.unique()
-        enf_oranlari = {2020: 0.14, 2021: 0.19, 2022: 0.72, 2023: 0.65, 2024: 0.55, 2025: 0.45, 2026: 0.35}
-        cumulative_enf = [100]
-        current_val = 100
-        for i in range(1, len(veriler.index)):
-            yil = veriler.index[i].year
-            oran = enf_oranlari.get(yil, 0.45)
-            gunluk_artis = (1 + oran) ** (1/252)
-            current_val *= gunluk_artis
-            cumulative_enf.append(current_val)
-        fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
+        if "Enflasyon" in kiyas_secenek:
+            enf_oranlari = {2020: 0.14, 2021: 0.19, 2022: 0.72, 2023: 0.65, 2024: 0.55, 2025: 0.45, 2026: 0.35}
+            cumulative_enf = [100]
+            current_val = 100
+            for i in range(1, len(veriler.index)):
+                yil = veriler.index[i].year
+                oran = enf_oranlari.get(yil, 0.45)
+                gunluk_artis = (1 + oran) ** (1/252)
+                current_val *= gunluk_artis
+                cumulative_enf.append(current_val)
+            fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
 
-    fig_norm.update_layout(template="plotly_white", height=500, yaxis_title="Getiri Endeksi (100)")
-    st.plotly_chart(fig_norm, use_container_width=True)
+        fig_norm.update_layout(template="plotly_white", height=500, yaxis_title="Getiri Endeksi (100)")
+        st.plotly_chart(fig_norm, use_container_width=True)
+    else:
+        st.warning(f"{t_kod} için bu tarih aralığında yeterli veri yok. Lütfen süreyi kısaltmayı deneyin.")
+else:
+    st.info("Kıyaslama verileri hazırlanıyor veya seçilen hisse için veri çekilemiyor.")
 
 # --- PÖRTFÖY YÖNETİMİ ---
 st.divider()
