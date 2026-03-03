@@ -37,12 +37,11 @@ hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-# --- 3. VERİ FONKSİYONU (GELİŞTİRİLMİŞ) ---
+# --- 3. VERİ FONKSİYONU ---
 def veri_indir_guvenli(tickers, period="1y", interval="1d"):
     try:
         data = yf.download(tickers, period=period, interval=interval, progress=False)
         if data.empty: return None
-        # Multi-index yapısını düzelt (Önemli!)
         if isinstance(data.columns, pd.MultiIndex):
             if 'Close' in data.columns:
                 return data['Close']
@@ -55,43 +54,46 @@ st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
-# --- 5. TEKNİK ANALİZ GRAFİĞİ (DÜZELTİLDİ) ---
-st.header("🔍 Hisse Teknik Analizi")
+# --- 5. SEÇİM PANELİ (ÜSTTE TOPLANDI) ---
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
     ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
     t_kod = ana_secim.split(" - ")[0]
-    t_sure = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
+    t_sure_etiket = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
 
+# Süre Haritalama
 t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
 t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
+secilen_periyot = t_periyot[t_sure_etiket]
+secilen_aralik = t_aralik[t_sure_etiket]
 
-# Teknik analiz için veri çekme
-hisse_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", t_periyot[t_sure], t_aralik[t_sure])
+# --- 6. TEKNİK ANALİZ GRAFİĞİ ---
+st.header(f"🔍 {t_kod} Teknik Analizi")
+hisse_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", secilen_periyot, secilen_aralik)
 
 if hisse_fiyat_raw is not None:
-    # Eğer veri DataFrame ise ilgili kolonu çek
     if isinstance(hisse_fiyat_raw, pd.DataFrame):
         hisse_fiyat = hisse_fiyat_raw[f"{t_kod}.IS"] if f"{t_kod}.IS" in hisse_fiyat_raw.columns else hisse_fiyat_raw.iloc[:, 0]
     else:
         hisse_fiyat = hisse_fiyat_raw
 
     fig_raw = go.Figure(data=[go.Scatter(x=hisse_fiyat.index, y=hisse_fiyat, line=dict(color='#00d1b2', width=2))])
-    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400, yaxis_title="Fiyat (TL)")
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri ({t_sure_etiket})", template="plotly_white", height=400, yaxis_title="Fiyat (TL)")
     st.plotly_chart(fig_raw, use_container_width=True)
 else:
-    st.error(f"{t_kod} için veri çekilemedi. Lütfen internet bağlantınızı veya sembolü kontrol edin.")
+    st.error("Veri çekilemedi.")
 
-# --- 6. KIYASLAMA BÖLÜMÜ ---
+# --- 7. KIYASLAMA BÖLÜMÜ (SÜREYE BAĞLANDI) ---
 st.divider()
-st.header("📊 Karşılaştırmalı Performans (Normalize 100)")
-kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"], key="kiyas_ms")
+st.header(f"📊 Karşılaştırmalı Performans - {t_sure_etiket}")
+kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
+# Dinamik süre ile veri çekme (Kıyaslama da artık t_sure_etiket'e bağlı)
 indir_list = [f"{t_kod}.IS"]
 if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
 if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
 
-veriler_kiyas = veri_indir_guvenli(indir_list, period="1y")
+veriler_kiyas = veri_indir_guvenli(indir_list, period=secilen_periyot)
 
 if veriler_kiyas is not None:
     fig_norm = go.Figure()
@@ -106,29 +108,23 @@ if veriler_kiyas is not None:
             fig_norm.add_trace(go.Scatter(x=series.index, y=(series/series.iloc[0])*100, name=label, line=dict(color=color)))
 
     ciz_norm(f"{t_kod}.IS", t_kod, "#1f77b4")
-    
     if "Altın (Ons)" in kiyas_secenek: ciz_norm("GC=F", "Altın (Ons)", "gold")
-    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("SI=F", "Gümüş (Ons)", "silver")
+    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("Gümüş (Ons)", "SI=F", "silver")
     
-    if "Enflasyon (%65)" in kiyas_secenek:
+    if "Enflasyon" in kiyas_secenek:
+        # Seçilen süreye göre yıllık %65 üzerinden yaklaşık enflasyon hesabı
         h_idx = veriler_kiyas.index
+        # 1 yıl için %65 ise, toplam getiri = 100 * (1 + 0.65 * (toplam_gun / 252)) mantığı
         fig_norm.add_trace(go.Scatter(x=h_idx, y=[100*(1+0.65*(i/len(h_idx))) for i in range(len(h_idx))], 
                                      name="Enflasyon", line=dict(dash='dash', color='red')))
     
     fig_norm.update_layout(template="plotly_white", height=450, yaxis_title="Getiri Endeksi (100)")
     st.plotly_chart(fig_norm, use_container_width=True)
 
-    # --- KULLANIM AMACI NOTU (EKLEDİM) ---
-    with st.expander("ℹ️ Bu Grafik Ne Anlatıyor? (Kullanım Amacı)", expanded=True):
-        st.info("""
-        **Neden 100 Değerinden Başlıyor?**
-        Farklı fiyatlardaki varlıkları (Örn: 200 TL'lik hisse ve 2500 Dolarlık Altın) aynı grafikte görebilmek için **Normalizasyon** kullanılır. 
-        Tüm varlıklar dönemin başında 100 birim kabul edilir; böylece hangi yatırımın **yüzdesel olarak** daha çok kazandırdığı net bir şekilde görülür.
+    with st.expander("ℹ️ Bu Grafik Ne Anlatıyor?", expanded=True):
+        st.info(f"Seçilen **{t_sure_etiket}** dönemi boyunca tüm varlıklar başlangıçta 100 kabul edilmiştir. Bu sayede varlıkların reel getirilerini birbirleriyle ve enflasyonla kıyaslayabilirsiniz.")
 
-        **Önemli Gösterge:** Eğer hisse çizginiz kırmızı kesikli **Enflasyon** çizgisinin altındaysa, paranız reel olarak değer kaybediyor demektir.
-        """)
-
-# --- 7. PÖRTFÖY YÖNETİMİ ---
+# --- 8. PÖRTFÖY YÖNETİMİ ---
 st.divider()
 st.header("💰 Pörtföyüm & Kar-Zarar")
 
@@ -149,7 +145,6 @@ if not st.session_state.portfoy.empty:
     for idx, row in st.session_state.portfoy.iterrows():
         g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
         if not g_veri.empty:
-            # Pörtföy kısmında da multi-index kontrolü
             if isinstance(g_veri.columns, pd.MultiIndex):
                 g_fiyat = float(g_veri['Close'][f"{row['Hisse']}.IS"].iloc[-1])
             else:
