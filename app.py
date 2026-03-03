@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # --- 1. SAYFA AYARLARI ---
-st.set_page_config(page_title="BIST 100 Terminali - Enes Boz", layout="wide")
+st.set_page_config(page_title="BIST Terminal - Enes Boz", layout="wide")
 
 # --- 2. BIST 100 TÜM ŞİRKET LİSTESİ ---
 bist_100_full = {
@@ -32,86 +32,109 @@ bist_100_full = {
     "ULKER": "Ülker Bisküvi", "VAKBN": "Vakıfbank", "VESBE": "Vestel Beyaz Eşya", "VESTL": "Vestel",
     "YEOTK": "Yeo Teknoloji", "YKBNK": "Yapı Kredi Bankası", "YYLGD": "Yaylatepe Gıda", "ZOREN": "Zorlu Enerji"
 }
-
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
-# --- 3. VERİ FONKSİYONU ---
-@st.cache_data(ttl=600)
-def veri_hazirla(ticker_list):
+# --- 3. OTURUM YÖNETİMİ (Portföy Hafızası) ---
+if 'portfoy' not in st.session_state:
+    st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
+
+# --- 4. VERİ ÇEKME FONKSİYONU ---
+@st.cache_data(ttl=300)
+def veri_indir(tickers):
     try:
-        data = yf.download(ticker_list, period="1y", interval="1d", progress=False)
-        if data.empty:
-            return None
-        # Her zaman DataFrame döndür ve Close sütununa odaklan
-        if 'Close' in data:
-            return data['Close']
-        return None
+        data = yf.download(tickers, period="1y", interval="1d", progress=False)
+        return data['Close'] if not data.empty else None
     except:
         return None
 
-# --- 4. ARAYÜZ ---
-st.title("🚀 BIST 100 Stratejik Terminal")
+# --- 5. ARAYÜZ BAŞLANGIÇ ---
+st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
-# --- 5. GRAFİK BÖLÜMÜ ---
-st.header("📊 Karşılaştırmalı Grafik Analizi")
+# --- 6. TEKNİK ANALİZ GRAFİĞİ (BAĞIMSIZ) ---
+st.header("🔍 Hisse Teknik Analizi")
+secilen_hisse_str = st.selectbox("Teknik Grafik İçin Hisse Seçin:", hisse_listesi, index=76)
+secilen_kod = secilen_hisse_str.split(" - ")[0]
 
-c1, c2 = st.columns([1, 2])
-with c1:
-    secim = st.selectbox("Hisse Seçin:", hisse_listesi, index=76)
-    secilen_kod = secim.split(" - ")[0]
-    kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"])
+hisse_verisi = veri_indir(f"{secilen_kod}.IS")
+if hisse_verisi is not None:
+    fig_raw = go.Figure()
+    fig_raw.add_trace(go.Scatter(x=hisse_verisi.index, y=hisse_verisi, name="Fiyat", line=dict(color='#00ff00', width=2)))
+    fig_raw.update_layout(title=f"{secilen_kod} Günlük Fiyat Grafiği", template="plotly_white", height=400)
+    st.plotly_chart(fig_raw, use_container_width=True)
 
-# Ticker listesini oluştur
-ana_ticker = f"{secilen_kod}.IS"
-indirilecekler = [ana_ticker]
+# --- 7. KARŞILAŞTIRMALI ANALİZ GRAFİĞİ ---
+st.divider()
+st.header("📊 Kıyaslama (Normalize 100)")
+kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"], key="kiyas_multiselect")
+
+indirilecekler = [f"{secilen_kod}.IS"]
 if "Altın (Ons)" in kiyas_secenek: indirilecekler.append("GC=F")
 if "Gümüş (Ons)" in kiyas_secenek: indirilecekler.append("SI=F")
 
-veriler = veri_hazirla(indirilecekler)
+veriler_kiyas = veri_indir(indirilecekler)
+if veriler_kiyas is not None:
+    fig_norm = go.Figure()
+    def norm_ciz(col, label, color=None):
+        series = veriler_kiyas[col].dropna() if isinstance(veriler_kiyas, pd.DataFrame) else veriler_kiyas.dropna()
+        if not series.empty:
+            fig_norm.add_trace(go.Scatter(x=series.index, y=(series/series.iloc[0])*100, name=label, line=dict(color=color)))
 
-if veriler is not None:
-    fig = go.Figure()
-    
-    # Yardımcı Çizim Fonksiyonu
-    def grafik_ekle(sutun_adi, etiket, renk=None, stil=None):
-        # Tek hisse seçildiğinde veriler Series olabilir, çoklu ise DataFrame
-        if isinstance(veriler, pd.Series):
-            y_verisi = veriler.dropna()
-        else:
-            y_verisi = veriler[sutun_adi].dropna()
-            
-        if not y_verisi.empty:
-            norm_y = (y_verisi / y_verisi.iloc[0]) * 100
-            fig.add_trace(go.Scatter(x=norm_y.index, y=norm_y, name=etiket, 
-                                     line=dict(color=renk, dash=stil, width=2.5)))
-
-    # Ana Hisse
-    grafik_ekle(ana_ticker, secilen_kod, renk="#1f77b4")
-
-    # Kıyaslamalar
-    if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler.columns:
-        grafik_ekle("GC=F", "Altın (Ons)", renk="gold")
-    
-    if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler.columns:
-        grafik_ekle("SI=F", "Gümüş (Ons)", renk="silver")
-
+    norm_ciz(f"{secilen_kod}.IS" if isinstance(veriler_kiyas, pd.DataFrame) else None, secilen_kod, "#1f77b4")
+    if "Altın (Ons)" in kiyas_secenek: norm_ciz("GC=F", "Altın", "gold")
+    if "Gümüş (Ons)" in kiyas_secenek: norm_ciz("SI=F", "Gümüş", "silver")
     if "Enflasyon (%65)" in kiyas_secenek:
-        # Enflasyon çizgisi için tarih eksenini ana hisseden al
-        h_idx = veriler.index if isinstance(veriler, pd.Series) else veriler[ana_ticker].dropna().index
-        enf_y = [100 * (1 + 0.65 * (i/len(h_idx))) for i in range(len(h_idx))]
-        fig.add_trace(go.Scatter(x=h_idx, y=enf_y, name="Enflasyon Trendi", 
-                                 line=dict(color="red", dash="dash")))
+        idx = veriler_kiyas.index
+        fig_norm.add_trace(go.Scatter(x=idx, y=[100*(1+0.65*(i/len(idx))) for i in range(len(idx))], name="Enflasyon", line=dict(dash='dash', color='red')))
+    
+    st.plotly_chart(fig_norm, use_container_width=True)
 
-    fig.update_layout(template="plotly_white", height=600, yaxis_title="Getiri Endeksi (100)")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.error("Veri çekilemedi. Lütfen internet bağlantısını kontrol edin.")
-
-
-
-# --- 6. PORTFÖY MODÜLÜ (Bağımsız Alan) ---
+# --- 8. PORTFÖY TAKİP SİSTEMİ ---
 st.divider()
-st.header("💰 Portföy Takip")
-# Buraya daha önce çalışan portföy kodlarını ekleyebilirsin.
+st.header("💰 Portföy Yönetim Masası")
+
+# Ekleme Formu
+with st.container():
+    p1, p2, p3, p4 = st.columns([2, 1, 1, 1])
+    with p1: p_hisse = st.selectbox("Portföye Eklenecek Hisse:", hisse_listesi, key="p_add")
+    with p2: p_maliyet = st.number_input("Alış Fiyatı (TL)", min_value=0.0, step=0.01, format="%.2f")
+    with p3: p_adet = st.number_input("Adet", min_value=1, step=1)
+    with p4:
+        st.write("##")
+        if st.button("Hisse Ekle"):
+            kod = p_hisse.split(" - ")[0]
+            yeni_hisse = pd.DataFrame([{'Hisse': kod, 'Maliyet': p_maliyet, 'Adet': p_adet}])
+            st.session_state.portfoy = pd.concat([st.session_state.portfoy, yeni_hisse], ignore_index=True)
+            st.rerun()
+
+# Liste ve Kar/Zarar Hesaplama
+if not st.session_state.portfoy.empty:
+    st.subheader("Varlıklarım")
+    toplam_maliyet, toplam_guncel = 0.0, 0.0
+    
+    for idx, row in st.session_state.portfoy.iterrows():
+        fiyat_bilgi = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
+        if not fiyat_bilgi.empty:
+            guncel_f = float(fiyat_bilgi['Close'].iloc[-1])
+            alis_tutar = row['Maliyet'] * row['Adet']
+            guncel_tutar = guncel_f * row['Adet']
+            kz_tl = guncel_tutar - alis_tutar
+            toplam_maliyet += alis_tutar
+            toplam_guncel += guncel_tutar
+
+            r1, r2, r3, r4, r5 = st.columns([1, 1, 1, 1, 0.5])
+            r1.write(f"**{row['Hisse']}**")
+            r2.write(f"Maliyet: {row['Maliyet']:.2f}")
+            r3.write(f"Güncel: {guncel_f:.2f}")
+            r4.write(f"K/Z: {kz_tl:,.2f} TL")
+            if r5.button("❌", key=f"del_{idx}"):
+                st.session_state.portfoy = st.session_state.portfoy.drop(idx).reset_index(drop=True)
+                st.rerun()
+
+    st.divider()
+    res1, res2, res3 = st.columns(3)
+    res1.metric("Toplam Alış Tutarı", f"{toplam_maliyet:,.2f} TL")
+    res2.metric("Toplam Güncel Değer", f"{toplam_guncel:,.2f} TL")
+    res3.metric("Toplam Kar/Zarar", f"{toplam_guncel - toplam_maliyet:,.2f} TL", 
+                delta=f"{((toplam_guncel/toplam_maliyet)-1)*100:.2f}%" if toplam_maliyet > 0 else "0%")
