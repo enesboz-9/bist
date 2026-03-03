@@ -38,12 +38,14 @@ hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-def veri_indir_guvenli(tickers, period="1y", interval="1d"):
+# --- 3. DAHA STABİL VERİ ÇEKME FONKSİYONU ---
+def tekli_veri_indir(ticker, period, interval="1d"):
     try:
-        data = yf.download(tickers, period=period, interval=interval, auto_adjust=True, progress=False)
-        if data.empty: return None
-        return data['Close'].ffill() if isinstance(data.columns, pd.MultiIndex) else data['Close']
-    except: return None
+        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+        if data.empty: return pd.Series()
+        return data['Close']
+    except:
+        return pd.Series()
 
 st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
@@ -51,79 +53,85 @@ st.divider()
 
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
-    ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
+    ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=36) # GARAN varsayılan
     t_kod = ana_secim.split(" - ")[0]
-    t_sure_etiket = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
+    t_sure_etiket = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=2, horizontal=True)
 
 t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
-t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
+t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1d"} # 5 yılda daha hassas veri için 1d yaptık
 secilen_periyot = t_periyot[t_sure_etiket]
 
-# --- TEKNİK ANALİZ ---
-h_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", secilen_periyot, t_aralik[t_sure_etiket])
-if h_fiyat_raw is not None:
-    seri = h_fiyat_raw[f"{t_kod}.IS"] if isinstance(h_fiyat_raw, pd.DataFrame) else h_fiyat_raw
-    if not seri.empty:
-        fig_raw = go.Figure(data=[go.Scatter(x=seri.index, y=seri, line=dict(color='#00d1b2', width=2))])
-        fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
-        st.plotly_chart(fig_raw, use_container_width=True)
-    else:
-        st.warning("Seçilen periyot için teknik veri bulunamadı.")
+# --- 4. TEKNİK ANALİZ (BAĞIMSIZ ÇİZİM) ---
+st.header(f"🔍 {t_kod} Teknik Görünüm")
+h_seri_ana = tekli_veri_indir(f"{t_kod}.IS", secilen_periyot, t_aralik[t_sure_etiket])
 
-# --- KIYASLAMA (HATA KORUMALI) ---
+if not h_seri_ana.empty:
+    fig_raw = go.Figure(data=[go.Scatter(x=h_seri_ana.index, y=h_seri_ana, line=dict(color='#00d1b2', width=2))])
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
+    st.plotly_chart(fig_raw, use_container_width=True)
+
+# --- 5. KIYASLAMA (İZOLE BİRLEŞTİRME STRATEJİSİ) ---
 st.divider()
-st.header(f"📊 TL Bazlı Performans - {t_sure_etiket}")
+st.header(f"📊 Karşılaştırmalı Getiri Analizi")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
-indir_list = [f"{t_kod}.IS", "USDTRY=X"]
-if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
-if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
-
-veriler = veri_indir_guvenli(indir_list, period=secilen_periyot)
-
-# Ana veri kontrolü
-if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" in veriler.columns:
-    veriler = veriler.ffill().dropna()
+if not h_seri_ana.empty:
+    # Tüm verileri bir DataFrame'de topla (Outer Join ile kayıpları önle)
+    df_comp = pd.DataFrame({t_kod: h_seri_ana})
     
-    if not veriler.empty:
-        kur = veriler["USDTRY=X"]
+    # Dolar kurunu her zaman çek (TL hesaplama için şart)
+    usd_seri = tekli_veri_indir("USDTRY=X", secilen_periyot)
+    if not usd_seri.empty:
+        df_comp = df_comp.join(usd_seri.rename("USD"), how='inner') # Sadece ikisinin de olduğu günleri al
+
+    if "Altın (Ons)" in kiyas_secenek:
+        gc_seri = tekli_veri_indir("GC=F", secilen_periyot)
+        if not gc_seri.empty:
+            df_comp = df_comp.join(gc_seri.rename("GOLD"), how='inner')
+
+    if "Gümüş (Ons)" in kiyas_secenek:
+        si_seri = tekli_veri_indir("SI=F", secilen_periyot)
+        if not si_seri.empty:
+            df_comp = df_comp.join(si_seri.rename("SILVER"), how='inner')
+
+    # Boşlukları doldur ve temizle
+    df_comp = df_comp.ffill().dropna()
+
+    if not df_comp.empty:
         fig_norm = go.Figure()
+        
+        # Hisse % Getiri
+        fig_norm.add_trace(go.Scatter(x=df_comp.index, y=(df_comp[t_kod]/df_comp[t_kod].iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
 
-        # Hisse Performansı
-        h_seri = veriler[f"{t_kod}.IS"]
-        fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
+        if "GOLD" in df_comp.columns:
+            altin_tl = df_comp["GOLD"] * df_comp["USD"]
+            fig_norm.add_trace(go.Scatter(x=df_comp.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
 
-        if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler.columns:
-            altin_tl = veriler["GC=F"] * kur
-            fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
-
-        if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler.columns:
-            gumus_tl = veriler["SI=F"] * kur
-            fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
+        if "SILVER" in df_comp.columns:
+            gumus_tl = df_comp["SILVER"] * df_comp["USD"]
+            fig_norm.add_trace(go.Scatter(x=df_comp.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
 
         if "Enflasyon" in kiyas_secenek:
             enf_oranlari = {2020: 0.14, 2021: 0.19, 2022: 0.72, 2023: 0.65, 2024: 0.55, 2025: 0.45, 2026: 0.35}
-            cumulative_enf = [100]
             current_val = 100
-            for i in range(1, len(veriler.index)):
-                yil = veriler.index[i].year
+            enf_list = [100]
+            for i in range(1, len(df_comp.index)):
+                yil = df_comp.index[i].year
                 oran = enf_oranlari.get(yil, 0.45)
                 gunluk_artis = (1 + oran) ** (1/252)
                 current_val *= gunluk_artis
-                cumulative_enf.append(current_val)
-            fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
+                enf_list.append(current_val)
+            fig_norm.add_trace(go.Scatter(x=df_comp.index, y=enf_list, name="Enflasyon", line=dict(dash='dot', color='red')))
 
         fig_norm.update_layout(template="plotly_white", height=500, yaxis_title="Getiri Endeksi (100)")
         st.plotly_chart(fig_norm, use_container_width=True)
     else:
-        st.warning(f"{t_kod} için bu tarih aralığında yeterli veri yok. Lütfen süreyi kısaltmayı deneyin.")
-else:
-    st.info("Kıyaslama verileri hazırlanıyor veya seçilen hisse için veri çekilemiyor.")
+        st.error("Veri birleştirme sırasında bir sorun oluştu. Lütfen süreyi değiştirip tekrar deneyin.")
 
-# --- PÖRTFÖY YÖNETİMİ ---
+# --- 6. PÖRTFÖY BÖLÜMÜ (Stabil) ---
 st.divider()
 st.header("💰 Pörtföyüm & Kar-Zarar")
-
+# ... (Pörtföy kodları aynı kalabilir)
 with st.expander("➕ Yeni Hisse Ekle", expanded=True):
     e1, e2, e3 = st.columns([2, 1, 1])
     with e1: p_hisse = st.selectbox("Hisse:", hisse_listesi, key="p_ek")
@@ -139,9 +147,9 @@ with st.expander("➕ Yeni Hisse Ekle", expanded=True):
 if not st.session_state.portfoy.empty:
     t_maliyet, t_guncel = 0.0, 0.0
     for idx, row in st.session_state.portfoy.iterrows():
-        g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", auto_adjust=True, progress=False)
-        if not g_veri.empty:
-            g_fiyat = float(g_veri['Close'].iloc[-1])
+        g_fiyat_seri = tekli_veri_indir(f"{row['Hisse']}.IS", period="5d")
+        if not g_fiyat_seri.empty:
+            g_fiyat = float(g_fiyat_seri.iloc[-1])
             m_toplam = row['Maliyet'] * row['Adet']
             g_toplam = g_fiyat * row['Adet']
             kz_tl = g_toplam - m_toplam
