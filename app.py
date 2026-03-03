@@ -7,7 +7,6 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="BIST 100 Terminali - Enes Boz", layout="wide")
 
 # --- 2. BIST 100 TÜM ŞİRKET LİSTESİ ---
-# Bu liste BIST 100 endeksindeki şirketlerin kodları ve isimlerini içerir.
 bist_100_full = {
     "AEFES": "Anadolu Efes", "AGHOL": "Anadolu Grubu Holding", "AKBNK": "Akbank", "AKCNS": "Akçansa",
     "AKFGY": "Akfen GYO", "AKSA": "Aksa", "AKSEN": "Aksa Enerji", "ALARK": "Alarko Holding",
@@ -34,15 +33,19 @@ bist_100_full = {
     "YEOTK": "Yeo Teknoloji", "YKBNK": "Yapı Kredi Bankası", "YYLGD": "Yaylatepe Gıda", "ZOREN": "Zorlu Enerji"
 }
 
-# Seçenek listesini "KOD - ŞİRKET ADI" formatında oluşturma
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
-# --- 3. VERİ ÇEKME FONKSİYONU ---
+# --- 3. VERİ FONKSİYONU ---
 @st.cache_data(ttl=600)
-def veri_hazirla(ticker_list, period="1y"):
+def veri_hazirla(ticker_list):
     try:
-        data = yf.download(ticker_list, period=period, interval="1d", progress=False)['Close']
-        return data
+        data = yf.download(ticker_list, period="1y", interval="1d", progress=False)
+        if data.empty:
+            return None
+        # Her zaman DataFrame döndür ve Close sütununa odaklan
+        if 'Close' in data:
+            return data['Close']
+        return None
     except:
         return None
 
@@ -51,65 +54,64 @@ st.title("🚀 BIST 100 Stratejik Terminal")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
-# --- 5. GELİŞMİŞ KARŞILAŞTIRMA GRAFİĞİ ---
+# --- 5. GRAFİK BÖLÜMÜ ---
 st.header("📊 Karşılaştırmalı Grafik Analizi")
 
 c1, c2 = st.columns([1, 2])
 with c1:
-    secim = st.selectbox("Hisse Seçin (Arama Yapabilirsiniz):", hisse_listesi, index=76) # Varsayılan THYAO
+    secim = st.selectbox("Hisse Seçin:", hisse_listesi, index=76)
     secilen_kod = secim.split(" - ")[0]
-    kiyas_elemanlari = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"])
+    kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"])
 
-# Gerekli Ticker'ları Topla
-tickers = [f"{secilen_kod}.IS"]
-if "Altın (Ons)" in kiyas_elemanlari: tickers.append("GC=F")
-if "Gümüş (Ons)" in kiyas_elemanlari: tickers.append("SI=F")
+# Ticker listesini oluştur
+ana_ticker = f"{secilen_kod}.IS"
+indirilecekler = [ana_ticker]
+if "Altın (Ons)" in kiyas_secenek: indirilecekler.append("GC=F")
+if "Gümüş (Ons)" in kiyas_secenek: indirilecekler.append("SI=F")
 
-with st.spinner("Piyasa verileri senkronize ediliyor..."):
-    veriler = veri_hazirla(tickers)
+veriler = veri_hazirla(indirilecekler)
 
-if veriler is not None and not veriler.empty:
+if veriler is not None:
     fig = go.Figure()
     
-    # Tüm verileri başlangıç noktasına göre normalize et (100)
-    # yfinance bazen tek hisse gelince Series, çoklu gelince DataFrame döndürür.
-    def ciz(col_name, label, color=None, dash=None):
-        series = veriler[col_name].dropna() if len(tickers) > 1 else veriler.dropna()
-        if not series.empty:
-            norm_series = (series / series.iloc[0]) * 100
-            fig.add_trace(go.Scatter(x=norm_series.index, y=norm_series, name=label, 
-                                     line=dict(color=color, dash=dash, width=2.5)))
+    # Yardımcı Çizim Fonksiyonu
+    def grafik_ekle(sutun_adi, etiket, renk=None, stil=None):
+        # Tek hisse seçildiğinde veriler Series olabilir, çoklu ise DataFrame
+        if isinstance(veriler, pd.Series):
+            y_verisi = veriler.dropna()
+        else:
+            y_verisi = veriler[sutun_adi].dropna()
+            
+        if not y_verisi.empty:
+            norm_y = (y_verisi / y_verisi.iloc[0]) * 100
+            fig.add_trace(go.Scatter(x=norm_y.index, y=norm_y, name=etiket, 
+                                     line=dict(color=renk, dash=stil, width=2.5)))
 
-    # Ana Hisse Çizimi
-    hisse_sutun = f"{secilen_kod}.IS" if len(tickers) > 1 else veriler.name
-    ciz(hisse_sutun, f"{secilen_kod}", color="#1f77b4")
+    # Ana Hisse
+    grafik_ekle(ana_ticker, secilen_kod, renk="#1f77b4")
 
-    # Altın/Gümüş Çizimi
-    if "Altın (Ons)" in kiyas_elemanlari:
-        ciz("GC=F", "Altın (Ons)", color="gold")
-    if "Gümüş (Ons)" in kiyas_elemanlari:
-        ciz("SI=F", "Gümüş (Ons)", color="silver")
+    # Kıyaslamalar
+    if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler.columns:
+        grafik_ekle("GC=F", "Altın (Ons)", renk="gold")
+    
+    if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler.columns:
+        grafik_ekle("SI=F", "Gümüş (Ons)", renk="silver")
 
-    # Enflasyon Çizimi
-    if "Enflasyon (%65)" in kiyas_elemanlari:
-        h_data = veriler[f"{secilen_kod}.IS"] if len(tickers) > 1 else veriler
-        enf_trend = [100 * (1 + 0.65 * (i/len(h_data))) for i in range(len(h_data))]
-        fig.add_trace(go.Scatter(x=h_data.index, y=enf_trend, name="Enflasyon Trendi", 
+    if "Enflasyon (%65)" in kiyas_secenek:
+        # Enflasyon çizgisi için tarih eksenini ana hisseden al
+        h_idx = veriler.index if isinstance(veriler, pd.Series) else veriler[ana_ticker].dropna().index
+        enf_y = [100 * (1 + 0.65 * (i/len(h_idx))) for i in range(len(h_idx))]
+        fig.add_trace(go.Scatter(x=h_idx, y=enf_y, name="Enflasyon Trendi", 
                                  line=dict(color="red", dash="dash")))
 
-    fig.update_layout(
-        template="plotly_white",
-        height=600,
-        xaxis_title="Son 1 Yıl",
-        yaxis_title="Getiri Endeksi (Başlangıç=100)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    fig.update_layout(template="plotly_white", height=600, yaxis_title="Getiri Endeksi (100)")
     st.plotly_chart(fig, use_container_width=True)
 else:
-    st.error("Veri yüklenemedi. Lütfen internet bağlantınızı kontrol edin.")
+    st.error("Veri çekilemedi. Lütfen internet bağlantısını kontrol edin.")
 
-# --- 6. PORTFÖY ÖZETİ (Önceki Fonksiyonelliği Koruyoruz) ---
+
+
+# --- 6. PORTFÖY MODÜLÜ (Bağımsız Alan) ---
 st.divider()
-st.header("💰 Portföyüm")
-# (Buraya daha önceki portföy ekleme/silme mantığını entegre edebilirsin)
-st.info("Portföy modülü yukarıdaki 'Hisse Seçin' kutusu ile senkronize çalışmaktadır.")
+st.header("💰 Portföy Takip")
+# Buraya daha önce çalışan portföy kodlarını ekleyebilirsin.
