@@ -116,7 +116,7 @@ if veriler is not None and isinstance(veriler, pd.DataFrame) and f"{t_kod}.IS" i
                 current_val *= gunluk_artis
                 cumulative_enf.append(current_val)
             fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
-            ozet_veriler.append({"Varlık": "Enflasyon Karşılığı (Erişim Gereken)", "Bugünkü Değer (TL)": f"{cumulative_enf[-1]:.2f} TL"})
+            ozet_veriler.append({"Varlık": "Enflasyon Karşılığı olması gereken değer", "Bugünkü Değer (TL)": f"{cumulative_enf[-1]:.2f} TL"})
 
         st.plotly_chart(fig_norm, use_container_width=True)
 
