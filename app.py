@@ -26,7 +26,7 @@ bist_100_full = {
     "OYAKC": "Oyak Çimento", "PENTA": "Penta Teknoloji", "PETKM": "Petkim", "PGSUS": "Pegasus",
     "QUAGR": "Qua Granite", "SAHOL": "Sabancı Holding", "SASA": "Sasa Polyester", "SAYAS": "Say Yenilenebilir Enerji",
     "SDTTR": "Sdt Uzay Ve Savunma", "SISE": "Şişecam", "SKBNK": "Şekerbank", "SMRTG": "Smart Güneş Enerjisi",
-    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Koruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
+    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Kuruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
     "THYAO": "Türk Hava Yolları", "TKFEN": "Tekfen Holding", "TOASO": "Tofaş Oto. Fab.", "TSKB": "Tskb",
     "TTKOM": "Türk Telekom", "TTRAK": "Türk Traktör", "TUPRS": "Tüpraş", "TURSG": "Türkiye Sigorta",
     "ULKER": "Ülker Bisküvi", "VAKBN": "Vakıfbank", "VESBE": "Vestel Beyaz Eşya", "VESTL": "Vestel",
@@ -54,14 +54,13 @@ st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
-# --- 5. SEÇİM PANELİ (ÜSTTE TOPLANDI) ---
+# --- 5. SEÇİM PANELİ ---
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
     ana_secim = st.selectbox("Analiz Edilecek Hisse:", hisse_listesi, index=76)
     t_kod = ana_secim.split(" - ")[0]
     t_sure_etiket = st.radio("Süre Seçin:", ["1 Ay", "1 Yıl", "5 Yıl"], index=1, horizontal=True)
 
-# Süre Haritalama
 t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
 t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
 secilen_periyot = t_periyot[t_sure_etiket]
@@ -83,12 +82,11 @@ if hisse_fiyat_raw is not None:
 else:
     st.error("Veri çekilemedi.")
 
-# --- 7. KIYASLAMA BÖLÜMÜ (SÜREYE BAĞLANDI) ---
+# --- 7. KIYASLAMA BÖLÜMÜ ---
 st.divider()
 st.header(f"📊 Karşılaştırmalı Performans - {t_sure_etiket}")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
-# Dinamik süre ile veri çekme (Kıyaslama da artık t_sure_etiket'e bağlı)
 indir_list = [f"{t_kod}.IS"]
 if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
 if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
@@ -109,12 +107,10 @@ if veriler_kiyas is not None:
 
     ciz_norm(f"{t_kod}.IS", t_kod, "#1f77b4")
     if "Altın (Ons)" in kiyas_secenek: ciz_norm("GC=F", "Altın (Ons)", "gold")
-    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("Gümüş (Ons)", "SI=F", "silver")
+    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("SI=F", "Gümüş (Ons)", "silver") # Hata burada düzeltildi
     
     if "Enflasyon" in kiyas_secenek:
-        # Seçilen süreye göre yıllık %65 üzerinden yaklaşık enflasyon hesabı
         h_idx = veriler_kiyas.index
-        # 1 yıl için %65 ise, toplam getiri = 100 * (1 + 0.65 * (toplam_gun / 252)) mantığı
         fig_norm.add_trace(go.Scatter(x=h_idx, y=[100*(1+0.65*(i/len(h_idx))) for i in range(len(h_idx))], 
                                      name="Enflasyon", line=dict(dash='dash', color='red')))
     
@@ -122,12 +118,12 @@ if veriler_kiyas is not None:
     st.plotly_chart(fig_norm, use_container_width=True)
 
     with st.expander("ℹ️ Bu Grafik Ne Anlatıyor?", expanded=True):
-        st.info(f"Seçilen **{t_sure_etiket}** dönemi boyunca tüm varlıklar başlangıçta 100 kabul edilmiştir. Bu sayede varlıkların reel getirilerini birbirleriyle ve enflasyonla kıyaslayabilirsiniz.")
+        st.info(f"Seçilen **{t_sure_etiket}** dönemi boyunca tüm varlıklar başlangıçta 100 kabul edilmiştir.")
 
 # --- 8. PÖRTFÖY YÖNETİMİ ---
 st.divider()
 st.header("💰 Pörtföyüm & Kar-Zarar")
-
+# (Geri kalan pörtföy kodları aynı şekilde devam ediyor)
 with st.expander("➕ Yeni Hisse Ekle", expanded=True):
     e1, e2, e3 = st.columns([2, 1, 1])
     with e1: p_hisse = st.selectbox("Hisse:", hisse_listesi, key="p_ek")
