@@ -27,7 +27,7 @@ bist_100_full = {
     "OYAKC": "Oyak Çimento", "PENTA": "Penta Teknoloji", "PETKM": "Petkim", "PGSUS": "Pegasus",
     "QUAGR": "Qua Granite", "SAHOL": "Sabancı Holding", "SASA": "Sasa Polyester", "SAYAS": "Say Yenilenebilir Enerji",
     "SDTTR": "Sdt Uzay Ve Savunma", "SISE": "Şişecam", "SKBNK": "Şekerbank", "SMRTG": "Smart Güneş Enerjisi",
-    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Kuruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
+    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Koruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
     "THYAO": "Türk Hava Yolları", "TKFEN": "Tekfen Holding", "TOASO": "Tofaş Oto. Fab.", "TSKB": "Tskb",
     "TTKOM": "Türk Telekom", "TTRAK": "Türk Traktör", "TUPRS": "Tüpraş", "TURSG": "Türkiye Sigorta",
     "ULKER": "Ülker Bisküvi", "VAKBN": "Vakıfbank", "VESBE": "Vestel Beyaz Eşya", "VESTL": "Vestel",
@@ -38,16 +38,13 @@ hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-# --- 3. DÜZELTİLMİŞ VERİ ÇEKME FONKSİYONU ---
 def veri_indir_guvenli(tickers, period="1y", interval="1d"):
     try:
-        # 'auto_adjust=True' bölünme ve temettüleri fiyata yedirir.
         data = yf.download(tickers, period=period, interval=interval, auto_adjust=True, progress=False)
         if data.empty: return None
         return data['Close'].ffill() if isinstance(data.columns, pd.MultiIndex) else data['Close']
     except: return None
 
-# --- 4. ARAYÜZ ---
 st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
@@ -62,17 +59,17 @@ t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
 t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
 secilen_periyot = t_periyot[t_sure_etiket]
 
-# --- 5. TEKNİK ANALİZ ---
+# --- TEKNİK ANALİZ ---
 h_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", secilen_periyot, t_aralik[t_sure_etiket])
 if h_fiyat_raw is not None:
     seri = h_fiyat_raw[f"{t_kod}.IS"] if isinstance(h_fiyat_raw, pd.DataFrame) else h_fiyat_raw
     fig_raw = go.Figure(data=[go.Scatter(x=seri.index, y=seri, line=dict(color='#00d1b2', width=2))])
-    fig_raw.update_layout(title=f"{t_kod} Düzeltilmiş Fiyat (Bölünmeler Dahil)", template="plotly_white", height=400)
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
     st.plotly_chart(fig_raw, use_container_width=True)
 
-# --- 6. KIYASLAMA (ENFLASYON VE BÖLÜNME DÜZELTMELİ) ---
+# --- KIYASLAMA ---
 st.divider()
-st.header(f"📊 TL Bazlı Performans (Bölünme/Enflasyon Düzeltmeli) - {t_sure_etiket}")
+st.header(f"📊 TL Bazlı Performans - {t_sure_etiket}")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon"], key="kiyas_ms")
 
 indir_list = [f"{t_kod}.IS", "USDTRY=X"]
@@ -86,45 +83,37 @@ if veriler is not None and isinstance(veriler, pd.DataFrame):
     kur = veriler["USDTRY=X"]
     fig_norm = go.Figure()
 
-    # Hisse (Adjusted Close sayesinde bölünmeler düzeltildi)
     h_seri = veriler[f"{t_kod}.IS"]
-    fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod} (Düzeltilmiş)", line=dict(width=3)))
+    fig_norm.add_trace(go.Scatter(x=h_seri.index, y=(h_seri/h_seri.iloc[0])*100, name=f"{t_kod}", line=dict(width=3)))
 
     if "Altın (Ons)" in kiyas_secenek:
         altin_tl = veriler["GC=F"] * kur
-        fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)"))
+        fig_norm.add_trace(go.Scatter(x=altin_tl.index, y=(altin_tl/altin_tl.iloc[0])*100, name="Altın (TL)", line=dict(color="gold")))
 
     if "Gümüş (Ons)" in kiyas_secenek:
         gumus_tl = veriler["SI=F"] * kur
-        fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)"))
+        fig_norm.add_trace(go.Scatter(x=gumus_tl.index, y=(gumus_tl/gumus_tl.iloc[0])*100, name="Gümüş (TL)", line=dict(color="silver")))
 
     if "Enflasyon" in kiyas_secenek:
-        # --- GERÇEKÇİ ENFLASYON HESABI ---
-        # 5 yıllık periyotta TR enflasyon geçişleri (Yıllık Ortalama Tahmini)
-        # 2021: %19, 2022: %72, 2023: %55, 2024: %50, 2025: %35 (Temsili/Yaklaşık)
         yillar = veriler.index.year.unique()
         enf_oranlari = {2020: 0.14, 2021: 0.19, 2022: 0.72, 2023: 0.65, 2024: 0.55, 2025: 0.45, 2026: 0.35}
-        
         cumulative_enf = [100]
         current_val = 100
         for i in range(1, len(veriler.index)):
             yil = veriler.index[i].year
-            # Yıllık oranı günlük orana çevir (Basit bileşik)
             oran = enf_oranlari.get(yil, 0.45)
             gunluk_artis = (1 + oran) ** (1/252)
             current_val *= gunluk_artis
             cumulative_enf.append(current_val)
-            
-        fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="TÜİK/Piyasa Enflasyon", line=dict(dash='dot', color='red')))
+        fig_norm.add_trace(go.Scatter(x=veriler.index, y=cumulative_enf, name="Enflasyon", line=dict(dash='dot', color='red')))
 
-    fig_norm.update_layout(template="plotly_white", height=500)
+    fig_norm.update_layout(template="plotly_white", height=500, yaxis_title="Getiri Endeksi (100)")
     st.plotly_chart(fig_norm, use_container_width=True)
 
-# --- 7. PÖRTFÖY YÖNETİMİ ---
+# --- PÖRTFÖY YÖNETİMİ ---
 st.divider()
 st.header("💰 Pörtföyüm & Kar-Zarar")
 
-# Pörtföy bölümünde de yfinance'den veri çekerken bölünmeleri düzeltecek yapı:
 with st.expander("➕ Yeni Hisse Ekle", expanded=True):
     e1, e2, e3 = st.columns([2, 1, 1])
     with e1: p_hisse = st.selectbox("Hisse:", hisse_listesi, key="p_ek")
@@ -140,7 +129,6 @@ with st.expander("➕ Yeni Hisse Ekle", expanded=True):
 if not st.session_state.portfoy.empty:
     t_maliyet, t_guncel = 0.0, 0.0
     for idx, row in st.session_state.portfoy.iterrows():
-        # Pörtföy güncel fiyatını da 'auto_adjust' ile çekiyoruz
         g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", auto_adjust=True, progress=False)
         if not g_veri.empty:
             g_fiyat = float(g_veri['Close'].iloc[-1])
