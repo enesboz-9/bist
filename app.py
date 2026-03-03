@@ -37,20 +37,25 @@ hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 if 'portfoy' not in st.session_state:
     st.session_state.portfoy = pd.DataFrame(columns=['Hisse', 'Maliyet', 'Adet'])
 
-# --- 3. VERİ FONKSİYONU ---
+# --- 3. VERİ FONKSİYONU (GELİŞTİRİLMİŞ) ---
 def veri_indir_guvenli(tickers, period="1y", interval="1d"):
     try:
         data = yf.download(tickers, period=period, interval=interval, progress=False)
         if data.empty: return None
+        # Multi-index yapısını düzelt (Önemli!)
+        if isinstance(data.columns, pd.MultiIndex):
+            if 'Close' in data.columns:
+                return data['Close']
         return data['Close'] if 'Close' in data else data
-    except: return None
+    except:
+        return None
 
 # --- 4. ARAYÜZ BAŞLANGIÇ ---
 st.title("📈 BIST Stratejik Analiz Terminali")
 st.markdown("### **Geliştirici:** Enes Boz")
 st.divider()
 
-# --- 5. TEKNİK ANALİZ GRAFİĞİ ---
+# --- 5. TEKNİK ANALİZ GRAFİĞİ (DÜZELTİLDİ) ---
 st.header("🔍 Hisse Teknik Analizi")
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
@@ -61,19 +66,27 @@ with t_col1:
 t_periyot = {"1 Ay": "1mo", "1 Yıl": "1y", "5 Yıl": "5y"}
 t_aralik = {"1 Ay": "1h", "1 Yıl": "1d", "5 Yıl": "1wk"}
 
-hisse_fiyat = veri_indir_guvenli(f"{t_kod}.IS", t_periyot[t_sure], t_aralik[t_sure])
+# Teknik analiz için veri çekme
+hisse_fiyat_raw = veri_indir_guvenli(f"{t_kod}.IS", t_periyot[t_sure], t_aralik[t_sure])
 
-if hisse_fiyat is not None:
+if hisse_fiyat_raw is not None:
+    # Eğer veri DataFrame ise ilgili kolonu çek
+    if isinstance(hisse_fiyat_raw, pd.DataFrame):
+        hisse_fiyat = hisse_fiyat_raw[f"{t_kod}.IS"] if f"{t_kod}.IS" in hisse_fiyat_raw.columns else hisse_fiyat_raw.iloc[:, 0]
+    else:
+        hisse_fiyat = hisse_fiyat_raw
+
     fig_raw = go.Figure(data=[go.Scatter(x=hisse_fiyat.index, y=hisse_fiyat, line=dict(color='#00d1b2', width=2))])
-    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400)
+    fig_raw.update_layout(title=f"{t_kod} Fiyat Hareketleri", template="plotly_white", height=400, yaxis_title="Fiyat (TL)")
     st.plotly_chart(fig_raw, use_container_width=True)
+else:
+    st.error(f"{t_kod} için veri çekilemedi. Lütfen internet bağlantınızı veya sembolü kontrol edin.")
 
-# --- 6. KIYASLAMA BÖLÜMÜ (GERİ EKLENDİ) ---
+# --- 6. KIYASLAMA BÖLÜMÜ ---
 st.divider()
 st.header("📊 Karşılaştırmalı Performans (Normalize 100)")
 kiyas_secenek = st.multiselect("Grafiğe Ekle:", ["Altın (Ons)", "Gümüş (Ons)", "Enflasyon (%65)"], key="kiyas_ms")
 
-# Kıyaslama için verileri çek
 indir_list = [f"{t_kod}.IS"]
 if "Altın (Ons)" in kiyas_secenek: indir_list.append("GC=F")
 if "Gümüş (Ons)" in kiyas_secenek: indir_list.append("SI=F")
@@ -83,22 +96,20 @@ veriler_kiyas = veri_indir_guvenli(indir_list, period="1y")
 if veriler_kiyas is not None:
     fig_norm = go.Figure()
     
-    # Yardımcı Çizim
     def ciz_norm(ticker, label, color=None):
-        series = veriler_kiyas[ticker].dropna() if isinstance(veriler_kiyas, pd.DataFrame) else veriler_kiyas.dropna()
-        if not series.empty:
+        if isinstance(veriler_kiyas, pd.DataFrame):
+            series = veriler_kiyas[ticker].dropna() if ticker in veriler_kiyas.columns else None
+        else:
+            series = veriler_kiyas.dropna()
+        
+        if series is not None and not series.empty:
             fig_norm.add_trace(go.Scatter(x=series.index, y=(series/series.iloc[0])*100, name=label, line=dict(color=color)))
 
-    # Ana Hisse
-    ciz_norm(f"{t_kod}.IS" if isinstance(veriler_kiyas, pd.DataFrame) else None, t_kod, "#1f77b4")
+    ciz_norm(f"{t_kod}.IS", t_kod, "#1f77b4")
     
-    # Altın/Gümüş
-    if "Altın (Ons)" in kiyas_secenek and "GC=F" in veriler_kiyas.columns:
-        ciz_norm("GC=F", "Altın (Ons)", "gold")
-    if "Gümüş (Ons)" in kiyas_secenek and "SI=F" in veriler_kiyas.columns:
-        ciz_norm("SI=F", "Gümüş (Ons)", "silver")
+    if "Altın (Ons)" in kiyas_secenek: ciz_norm("GC=F", "Altın (Ons)", "gold")
+    if "Gümüş (Ons)" in kiyas_secenek: ciz_norm("SI=F", "Gümüş (Ons)", "silver")
     
-    # Enflasyon
     if "Enflasyon (%65)" in kiyas_secenek:
         h_idx = veriler_kiyas.index
         fig_norm.add_trace(go.Scatter(x=h_idx, y=[100*(1+0.65*(i/len(h_idx))) for i in range(len(h_idx))], 
@@ -106,6 +117,16 @@ if veriler_kiyas is not None:
     
     fig_norm.update_layout(template="plotly_white", height=450, yaxis_title="Getiri Endeksi (100)")
     st.plotly_chart(fig_norm, use_container_width=True)
+
+    # --- KULLANIM AMACI NOTU (EKLEDİM) ---
+    with st.expander("ℹ️ Bu Grafik Ne Anlatıyor? (Kullanım Amacı)", expanded=True):
+        st.info("""
+        **Neden 100 Değerinden Başlıyor?**
+        Farklı fiyatlardaki varlıkları (Örn: 200 TL'lik hisse ve 2500 Dolarlık Altın) aynı grafikte görebilmek için **Normalizasyon** kullanılır. 
+        Tüm varlıklar dönemin başında 100 birim kabul edilir; böylece hangi yatırımın **yüzdesel olarak** daha çok kazandırdığı net bir şekilde görülür.
+
+        **Önemli Gösterge:** Eğer hisse çizginiz kırmızı kesikli **Enflasyon** çizgisinin altındaysa, paranız reel olarak değer kaybediyor demektir.
+        """)
 
 # --- 7. PÖRTFÖY YÖNETİMİ ---
 st.divider()
@@ -128,7 +149,12 @@ if not st.session_state.portfoy.empty:
     for idx, row in st.session_state.portfoy.iterrows():
         g_veri = yf.download(f"{row['Hisse']}.IS", period="1d", progress=False)
         if not g_veri.empty:
-            g_fiyat = float(g_veri['Close'].iloc[-1])
+            # Pörtföy kısmında da multi-index kontrolü
+            if isinstance(g_veri.columns, pd.MultiIndex):
+                g_fiyat = float(g_veri['Close'][f"{row['Hisse']}.IS"].iloc[-1])
+            else:
+                g_fiyat = float(g_veri['Close'].iloc[-1])
+                
             m_toplam = row['Maliyet'] * row['Adet']
             g_toplam = g_fiyat * row['Adet']
             kz_tl = g_toplam - m_toplam
@@ -149,4 +175,4 @@ if not st.session_state.portfoy.empty:
     m1, m2, m3 = st.columns(3)
     m1.metric("Toplam Yatırım", f"{t_maliyet:,.2f} TL")
     m2.metric("Güncel Değer", f"{t_guncel:,.2f} TL")
-    m3.metric("Net Kar/Zarar", f"{t_guncel - t_maliyet:,.2f} TL", delta=f"{((t_guncel/t_maliyet)-1)*100:.2f}%")
+    m3.metric("Net Kar/Zarar", f"{t_guncel - t_maliyet:,.2f} TL", delta=f"{((t_guncel/t_maliyet)-1)*100:.2f}%" if t_maliyet > 0 else "0%")
