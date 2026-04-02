@@ -3,7 +3,16 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import streamlit as st
 
+st.set_page_config(
+    page_title="HaberAI - Yapay Zeka Destekli Güncel Haber Analizi",
+    page_icon="📰",
+    layout="centered",
+    menu_items={
+        'About': "# HaberAI\nEn güncel haberleri yapay zeka ile analiz eden ücretsiz platform."
+    }
+)
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(page_title="BIST Terminal - Enes Boz", layout="wide")
 
