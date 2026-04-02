@@ -698,8 +698,8 @@ with tab1:
             fig.add_trace(go.Candlestick(
                 x=seri.index, open=open_s, high=high_s, low=low_s, close=seri,
                 name=t_kod,
-                increasing=dict(line=dict(color='#00ff88', width=1), fillcolor='#00ff8888'),
-                decreasing=dict(line=dict(color='#ff4444', width=1), fillcolor='#ff444488')
+                increasing=dict(line=dict(color='#00ff88', width=1)),
+                decreasing=dict(line=dict(color='#ff4444', width=1))
             ), row=cur_row, col=1)
 
             if goster_bb:
