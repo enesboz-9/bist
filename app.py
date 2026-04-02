@@ -1561,7 +1561,7 @@ st.markdown("""
     </div>
 </div>
 <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#2a3a4a;padding:8px">
-    BIST TERMINAL PRO &nbsp;•&nbsp; Geliştirici: Enes Boz &nbsp;•&nbsp; {datetime.now().year} &nbsp;•&nbsp;
+   BIST TERMINAL PRO &nbsp;•&nbsp; Geliştirici: Enes Boz &nbsp;•&nbsp; """ + str(datetime.now().year) + """ &nbsp;•&nbsp;
     Veriler Yahoo Finance kaynaklıdır
 </div>
-""".format(datetime=datetime), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
