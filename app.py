@@ -7,7 +7,17 @@ from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import json
+import streamlit as st
+import streamlit.components.v1 as components
 
+# --- GOOGLE SEARCH CONSOLE DOĞRULAMA ---
+# Bu kod Google botunun siteni tanımasını sağlar
+components.html(
+    """
+    <meta name="google-site-verification" content="1d889bb8ce646ba3" />
+    """,
+    height=0,
+)
 # ============================================================
 # SAYFA AYARLARI
 # ============================================================
