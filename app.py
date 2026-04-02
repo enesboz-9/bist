@@ -26,7 +26,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+components.html(
+    """
+    <head>
+        <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
+    </head>
+    """,
+    height=0,
+)
 # ============================================================
 # BLOOMBERG KARANLIK TEMA CSS
 # ============================================================
