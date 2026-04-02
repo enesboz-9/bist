@@ -75,39 +75,6 @@ html, body, [data-testid="stAppViewContainer"] {
     color: #4a6080;
     letter-spacing: 1px;
 }
-/* AUTH MODAL */
-.auth-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(8px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.auth-card {
-    background: linear-gradient(145deg, #0f1520, #141e2e);
-    border: 1px solid #00d4ff33;
-    border-radius: 16px;
-    padding: 40px;
-    width: 420px;
-    box-shadow: 0 0 60px #00d4ff11;
-}
-.auth-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 20px;
-    font-weight: 700;
-    color: #00d4ff;
-    margin-bottom: 4px;
-    letter-spacing: 2px;
-}
-.auth-subtitle {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #4a6080;
-    margin-bottom: 28px;
-}
 /* User badge */
 .user-badge {
     background: linear-gradient(135deg, #0f1520, #141e2e);
@@ -219,8 +186,26 @@ hr { border-color: #1e2a3a !important; }
 .badge-buy  { background: #00ff8822; color: #00ff88; border: 1px solid #00ff8844; }
 .badge-sell { background: #ff444422; color: #ff4444; border: 1px solid #ff444444; }
 .badge-hold { background: #ffaa0022; color: #ffaa00; border: 1px solid #ffaa0044; }
-/* Auth button özel */
-.auth-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+
+/* AUTH MODAL - ana içerik içinde kutu */
+.auth-box {
+    background: linear-gradient(145deg, #0f1520, #141e2e);
+    border: 1px solid #00d4ff44;
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 480px;
+    margin: 0 auto;
+}
+.auth-box-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: #00d4ff;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #1e2a3a;
+    padding-bottom: 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -269,7 +254,7 @@ def sb_cikis():
     st.session_state.portfoy = pd.DataFrame(columns=['id','Hisse','Maliyet','Adet','Hedef','Stop'])
     st.session_state.alarmlar = []
 
-def sb_sifre_sifirla(email: str):
+def sb_sifirla(email: str):
     try:
         sb.auth.reset_password_email(email)
         return True, None
@@ -351,17 +336,16 @@ def alarm_tetiklendi_guncelle(alarm_id):
         pass
 
 # ============================================================
-# AUTH UI — Sağ üst köşe + Modal
+# AUTH UI — Ana içerikte modal (sidebar DEĞİL)
 # ============================================================
 def auth_header_buton():
-    """Header'ın sağına Giriş Yap / Kullanıcı badge'i koyar."""
+    """Header sağına Giriş/Kullanıcı badge koyar."""
     if st.session_state.user:
         col1, col2 = st.columns([1, 1])
         with col1:
             st.markdown(f"""
-            <div class="user-badge">
-                ◈ {st.session_state.user_email}
-            </div>""", unsafe_allow_html=True)
+            <div class="user-badge">◈ {st.session_state.user_email}</div>""",
+            unsafe_allow_html=True)
         with col2:
             if st.button("Çıkış", key="cikis_btn"):
                 sb_cikis()
@@ -379,84 +363,101 @@ def auth_header_buton():
                 st.session_state.auth_mode = 'kayit'
                 st.rerun()
 
-def auth_modal():
-    """Ekran ortasında auth formu gösterir (sidebar'da)."""
-    if not st.session_state.show_auth:
+def auth_modal_ana():
+    """
+    Ana içerik alanında (tab'ların ÜSTünde) auth formu gösterir.
+    show_auth=True ve kullanıcı yoksa render edilir.
+    """
+    if not st.session_state.show_auth or st.session_state.user:
         return
 
-    st.markdown("---")
     mod = st.session_state.auth_mode
 
-    if mod == 'giris':
-        st.markdown('<div class="section-title">🔐 GİRİŞ YAP</div>', unsafe_allow_html=True)
-        email  = st.text_input("E-posta:", key="g_email", placeholder="siz@email.com")
-        sifre  = st.text_input("Şifre:", type="password", key="g_sifre")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Giriş", use_container_width=True, key="g_btn"):
-                if email and sifre:
-                    user, session, err = sb_giris(email.strip(), sifre)
-                    if err:
-                        st.error(f"❌ {err}")
+    # Ortalanmış kutu için boş kolonlar
+    _, center_col, _ = st.columns([1, 2, 1])
+
+    with center_col:
+        if mod == 'giris':
+            st.markdown('<div class="auth-box-title">🔐 GİRİŞ YAP</div>', unsafe_allow_html=True)
+            email = st.text_input("E-posta:", key="g_email", placeholder="siz@email.com")
+            sifre = st.text_input("Şifre:", type="password", key="g_sifre")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Giriş", use_container_width=True, key="g_btn"):
+                    if email and sifre:
+                        user, session, err = sb_giris(email.strip(), sifre)
+                        if err:
+                            st.error(f"❌ {err}")
+                        else:
+                            oturum_ac(user)
+                            st.success("✅ Giriş başarılı!")
+                            st.rerun()
                     else:
-                        oturum_ac(user)
-                        st.success("✅ Giriş başarılı!")
-                        st.rerun()
-                else:
-                    st.warning("E-posta ve şifre girin.")
-        with c2:
-            if st.button("İptal", use_container_width=True, key="g_iptal"):
-                st.session_state.show_auth = False
+                        st.warning("E-posta ve şifre girin.")
+            with c2:
+                if st.button("İptal", use_container_width=True, key="g_iptal"):
+                    st.session_state.show_auth = False
+                    st.rerun()
+            st.markdown("---")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("→ Kayıt Ol", key="gec_kayit", use_container_width=True):
+                    st.session_state.auth_mode = 'kayit'
+                    st.rerun()
+            with col_b:
+                if st.button("→ Şifremi Unuttum", key="gec_sifre", use_container_width=True):
+                    st.session_state.auth_mode = 'sifre'
+                    st.rerun()
+
+        elif mod == 'kayit':
+            st.markdown('<div class="auth-box-title">✨ KAYIT OL</div>', unsafe_allow_html=True)
+            ad    = st.text_input("Ad Soyad:", key="k_ad")
+            email = st.text_input("E-posta:", key="k_email", placeholder="siz@email.com")
+            sifre = st.text_input("Şifre:", type="password", key="k_sifre", help="En az 6 karakter")
+            sifre2= st.text_input("Şifre (tekrar):", type="password", key="k_sifre2")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Kayıt Ol", use_container_width=True, key="k_btn"):
+                    if not (ad and email and sifre and sifre2):
+                        st.warning("Tüm alanları doldurun.")
+                    elif sifre != sifre2:
+                        st.error("❌ Şifreler eşleşmiyor.")
+                    elif len(sifre) < 6:
+                        st.error("❌ Şifre en az 6 karakter olmalı.")
+                    else:
+                        user, err = sb_kayit(email.strip(), sifre, ad.strip())
+                        if err:
+                            st.error(f"❌ {err}")
+                        else:
+                            st.success("✅ Kayıt başarılı! E-postanızı onaylayın, ardından giriş yapın.")
+                            st.session_state.auth_mode = 'giris'
+                            st.rerun()
+            with c2:
+                if st.button("İptal", use_container_width=True, key="k_iptal"):
+                    st.session_state.show_auth = False
+                    st.rerun()
+            st.markdown("---")
+            if st.button("→ Zaten hesabım var", key="gec_giris", use_container_width=True):
+                st.session_state.auth_mode = 'giris'
                 st.rerun()
-        st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;margin-top:8px">Hesabınız yok mu?</div>', unsafe_allow_html=True)
-        if st.button("→ Kayıt Ol", key="gec_kayit"):
-            st.session_state.auth_mode = 'kayit'; st.rerun()
-        if st.button("→ Şifremi Unuttum", key="gec_sifre"):
-            st.session_state.auth_mode = 'sifre'; st.rerun()
 
-    elif mod == 'kayit':
-        st.markdown('<div class="section-title">✨ KAYIT OL</div>', unsafe_allow_html=True)
-        ad    = st.text_input("Ad Soyad:", key="k_ad")
-        email = st.text_input("E-posta:", key="k_email", placeholder="siz@email.com")
-        sifre = st.text_input("Şifre:", type="password", key="k_sifre", help="En az 6 karakter")
-        sifre2= st.text_input("Şifre (tekrar):", type="password", key="k_sifre2")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Kayıt Ol", use_container_width=True, key="k_btn"):
-                if not (ad and email and sifre and sifre2):
-                    st.warning("Tüm alanları doldurun.")
-                elif sifre != sifre2:
-                    st.error("❌ Şifreler eşleşmiyor.")
-                elif len(sifre) < 6:
-                    st.error("❌ Şifre en az 6 karakter olmalı.")
-                else:
-                    user, err = sb_kayit(email.strip(), sifre, ad.strip())
-                    if err:
-                        st.error(f"❌ {err}")
+        elif mod == 'sifre':
+            st.markdown('<div class="auth-box-title">🔑 ŞİFRE SIFIRLA</div>', unsafe_allow_html=True)
+            email = st.text_input("Kayıtlı E-posta:", key="s_email")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Link Gönder", use_container_width=True, key="s_btn"):
+                    ok, err = sb_sifirla(email.strip())
+                    if ok:
+                        st.success("✅ Şifre sıfırlama linki gönderildi.")
                     else:
-                        st.success("✅ Kayıt başarılı! E-postanızı onaylayın, ardından giriş yapın.")
-                        st.session_state.auth_mode = 'giris'
-                        st.rerun()
-        with c2:
-            if st.button("İptal", use_container_width=True, key="k_iptal"):
-                st.session_state.show_auth = False; st.rerun()
-        if st.button("→ Zaten hesabım var", key="gec_giris"):
-            st.session_state.auth_mode = 'giris'; st.rerun()
+                        st.error(f"❌ {err}")
+            with c2:
+                if st.button("Geri", use_container_width=True, key="s_geri"):
+                    st.session_state.auth_mode = 'giris'
+                    st.rerun()
 
-    elif mod == 'sifre':
-        st.markdown('<div class="section-title">🔑 ŞİFRE SIFIRLA</div>', unsafe_allow_html=True)
-        email = st.text_input("Kayıtlı E-posta:", key="s_email")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Link Gönder", use_container_width=True, key="s_btn"):
-                ok, err = sb_sifirla(email.strip())
-                if ok:
-                    st.success("✅ Şifre sıfırlama linki gönderildi.")
-                else:
-                    st.error(f"❌ {err}")
-        with c2:
-            if st.button("Geri", use_container_width=True, key="s_geri"):
-                st.session_state.auth_mode = 'giris'; st.rerun()
+    st.markdown("---")
 
 # ============================================================
 # BIST 100 LİSTESİ
@@ -712,6 +713,11 @@ with h_right:
 st.markdown('<hr style="margin:0 0 16px 0">', unsafe_allow_html=True)
 
 # ============================================================
+# AUTH MODAL — Tab'ların ÜSTÜNDE ana içerikte render et
+# ============================================================
+auth_modal_ana()
+
+# ============================================================
 # SIDEBAR
 # ============================================================
 with st.sidebar:
@@ -763,7 +769,6 @@ with st.sidebar:
                         (alarm['tur'] == "Altına Düşerse"  and g_fiyat <= alarm['fiyat'])
                     )
 
-                    # Mail gönder (saatte 1)
                     if tetiklendi and alarm.get('mail'):
                         mail_key = f"{alarm['id']}_{alarm['fiyat']}"
                         son = st.session_state.mail_gonderildi.get(mail_key)
@@ -794,34 +799,23 @@ with st.sidebar:
                 except:
                     pass
 
-        # Auth modal (sidebar içinde)
-        auth_modal()
-
     st.markdown("---")
+    # Karşılaştırma seçenekleri (grafik Tab1'e taşındı, sidebar'da seçim kalıyor)
     st.markdown('<div class="section-title">⚖ KARŞILAŞTIRMA</div>', unsafe_allow_html=True)
-    kiyas_secenek = st.multiselect("Ekle:", ["Altın (TL)", "Gümüş (TL)", "Dolar/TL", "Enflasyon"])
+    kiyas_secenek = st.multiselect("Karşılaştırma Ekle:", ["Altın (TL)", "Gümüş (TL)", "Dolar/TL", "Enflasyon"])
 
 # ============================================================
-# GIRIŞ YAPILMADIYSA AUTH MODAL GÖSTER
+# ANA TABS — Karşılaştırma tab'ı KALDIRILDI (4 tab)
 # ============================================================
-if st.session_state.show_auth and not st.session_state.user:
-    # Sidebar'da zaten auth_modal() çağrılıyor,
-    # ama burada bir bildirim göster
-    st.info("🔐 Sol panelden giriş yapın veya kayıt olun.")
-
-# ============================================================
-# ANA TABS
-# ============================================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📊  TEKNİK ANALİZ",
     "🤖  AI RAPORU",
     "📰  HABERLER",
-    "⚖   KARŞILAŞTIRMA",
     "💼  PORTFÖY"
 ])
 
 # ============================================================
-# TAB 1: TEKNİK ANALİZ
+# TAB 1: TEKNİK ANALİZ + KARŞILAŞTIRMA GRAFİĞİ
 # ============================================================
 with tab1:
     data_raw = veri_indir(f"{t_kod}.IS", secilen_periyot, secilen_aralik)
@@ -944,6 +938,80 @@ with tab1:
                 <div class="metric-label">{ind_ad}</div>
                 <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#c8d8e8;margin:4px 0">{ind_data['deger']}</div>
                 <span class="badge {badge_cls}">{ind_data['sinyal']}</span></div>""", unsafe_allow_html=True)
+
+        # ---- KARŞILAŞTIRMA GRAFİĞİ (eski Tab4) ----
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">⚖ PERFORMANS KARŞILAŞTIRMASI (100 TL)</div>', unsafe_allow_html=True)
+
+        indir_list = [f"{t_kod}.IS", "USDTRY=X"]
+        if "Altın (TL)"  in kiyas_secenek: indir_list.append("GC=F")
+        if "Gümüş (TL)" in kiyas_secenek: indir_list.append("SI=F")
+
+        @st.cache_data(ttl=300)
+        def indir_coklu(tickers_tuple, period):
+            try:
+                data = yf.download(list(tickers_tuple), period=period, auto_adjust=True, progress=False)
+                if data.empty: return None
+                return data['Close'].ffill() if isinstance(data.columns, pd.MultiIndex) else data
+            except:
+                return None
+
+        veriler = indir_coklu(tuple(sorted(set(indir_list))), secilen_periyot)
+        if veriler is not None:
+            if isinstance(veriler, pd.Series):
+                veriler = veriler.to_frame(name=indir_list[0])
+            veriler = veriler.ffill().dropna()
+
+            if not veriler.empty and f"{t_kod}.IS" in veriler.columns:
+                fig_k = go.Figure(); ozet = []
+                h_s = veriler[f"{t_kod}.IS"]; norm = (h_s / h_s.iloc[0]) * 100
+                fig_k.add_trace(go.Scatter(x=h_s.index, y=norm, name=f"{t_kod}", line=dict(color='#00d4ff', width=2.5)))
+                ozet.append({"Varlık": f"{t_kod}", "Başlangıç": "100 TL", "Güncel": f"{norm.iloc[-1]:.2f} TL", "Getiri": f"{norm.iloc[-1]-100:+.2f}%"})
+                kur = veriler.get("USDTRY=X", pd.Series(dtype=float))
+
+                if "Altın (TL)" in kiyas_secenek and "GC=F" in veriler.columns and not kur.empty:
+                    a_tl = veriler["GC=F"] * kur; a_norm = (a_tl / a_tl.iloc[0]) * 100
+                    fig_k.add_trace(go.Scatter(x=a_tl.index, y=a_norm, name="Altın (TL)", line=dict(color='#ffd700', width=2)))
+                    ozet.append({"Varlık": "Altın (TL)", "Başlangıç": "100 TL", "Güncel": f"{a_norm.iloc[-1]:.2f} TL", "Getiri": f"{a_norm.iloc[-1]-100:+.2f}%"})
+
+                if "Gümüş (TL)" in kiyas_secenek and "SI=F" in veriler.columns and not kur.empty:
+                    g_tl = veriler["SI=F"] * kur; g_norm = (g_tl / g_tl.iloc[0]) * 100
+                    fig_k.add_trace(go.Scatter(x=g_tl.index, y=g_norm, name="Gümüş (TL)", line=dict(color='#c0c0c0', width=2)))
+                    ozet.append({"Varlık": "Gümüş (TL)", "Başlangıç": "100 TL", "Güncel": f"{g_norm.iloc[-1]:.2f} TL", "Getiri": f"{g_norm.iloc[-1]-100:+.2f}%"})
+
+                if "Dolar/TL" in kiyas_secenek and not kur.empty:
+                    k_norm = (kur / kur.iloc[0]) * 100
+                    fig_k.add_trace(go.Scatter(x=kur.index, y=k_norm, name="Dolar/TL", line=dict(color='#88ff88', width=2)))
+                    ozet.append({"Varlık": "Dolar/TL", "Başlangıç": "100 TL", "Güncel": f"{k_norm.iloc[-1]:.2f} TL", "Getiri": f"{k_norm.iloc[-1]-100:+.2f}%"})
+
+                if "Enflasyon" in kiyas_secenek:
+                    enf = {2020:0.14,2021:0.19,2022:0.72,2023:0.65,2024:0.55,2025:0.45,2026:0.35}
+                    cum = [100]; val = 100
+                    for i in range(1, len(veriler.index)):
+                        val *= (1 + enf.get(veriler.index[i].year, 0.45)) ** (1/252); cum.append(val)
+                    fig_k.add_trace(go.Scatter(x=veriler.index, y=cum, name="Enflasyon", line=dict(color='#ff4444', width=1.5, dash='dot')))
+                    ozet.append({"Varlık": "Enflasyon", "Başlangıç": "100 TL", "Güncel": f"{cum[-1]:.2f} TL", "Getiri": f"{cum[-1]-100:+.2f}%"})
+
+                fig_k.update_layout(
+                    title=f"100 TL Yatırımın Performansı — {t_sure_etiket}",
+                    template="plotly_dark",
+                    plot_bgcolor='#0a0a0f', paper_bgcolor='#0a0a0f',
+                    yaxis_title="Değer (TL)", height=380,
+                    legend=dict(bgcolor='#0f1520', bordercolor='#1e2a3a', font=dict(family='JetBrains Mono', size=11)),
+                    font=dict(family='JetBrains Mono', color='#8899aa'),
+                    margin=dict(l=10, r=10, t=40, b=10))
+                fig_k.update_xaxes(gridcolor='#1e2a3a')
+                fig_k.update_yaxes(gridcolor='#1e2a3a')
+                st.plotly_chart(fig_k, use_container_width=True)
+
+                if len(ozet) > 1:
+                    st.markdown('<div class="section-title">PERFORMANS ÖZETİ</div>', unsafe_allow_html=True)
+                    st.dataframe(pd.DataFrame(ozet), use_container_width=True, hide_index=True)
+            else:
+                st.info("Sol panelden karşılaştırma varlığı seçin.")
+        else:
+            st.info("Sol panelden karşılaştırmak istediğiniz varlıkları seçin.")
+
     else:
         st.warning(f"⚠ {t_kod} için veri indirilemedi.")
 
@@ -1114,76 +1182,9 @@ with tab3:
                 pass
 
 # ============================================================
-# TAB 4: KARŞILAŞTIRMA
+# TAB 4: PORTFÖY
 # ============================================================
 with tab4:
-    st.markdown('<div class="section-title">⚖ TL BAZLI PERFORMANS KARŞILAŞTIRMASI</div>', unsafe_allow_html=True)
-    indir_list = [f"{t_kod}.IS", "USDTRY=X"]
-    if "Altın (TL)"  in kiyas_secenek: indir_list.append("GC=F")
-    if "Gümüş (TL)" in kiyas_secenek: indir_list.append("SI=F")
-
-    @st.cache_data(ttl=300)
-    def indir_coklu(tickers_tuple, period):
-        try:
-            data = yf.download(list(tickers_tuple), period=period, auto_adjust=True, progress=False)
-            if data.empty: return None
-            return data['Close'].ffill() if isinstance(data.columns, pd.MultiIndex) else data
-        except:
-            return None
-
-    veriler = indir_coklu(tuple(sorted(set(indir_list))), secilen_periyot)
-    if veriler is not None:
-        if isinstance(veriler, pd.Series):
-            veriler = veriler.to_frame(name=indir_list[0])
-        veriler = veriler.ffill().dropna()
-
-        if not veriler.empty and f"{t_kod}.IS" in veriler.columns:
-            fig_k = go.Figure(); ozet = []
-            h_s = veriler[f"{t_kod}.IS"]; norm = (h_s / h_s.iloc[0]) * 100
-            fig_k.add_trace(go.Scatter(x=h_s.index, y=norm, name=f"{t_kod}", line=dict(color='#00d4ff', width=2.5)))
-            ozet.append({"Varlık": f"{t_kod}", "Başlangıç": "100 TL", "Güncel": f"{norm.iloc[-1]:.2f} TL", "Getiri": f"{norm.iloc[-1]-100:+.2f}%"})
-            kur = veriler.get("USDTRY=X", pd.Series(dtype=float))
-
-            if "Altın (TL)" in kiyas_secenek and "GC=F" in veriler.columns and not kur.empty:
-                a_tl = veriler["GC=F"] * kur; a_norm = (a_tl / a_tl.iloc[0]) * 100
-                fig_k.add_trace(go.Scatter(x=a_tl.index, y=a_norm, name="Altın (TL)", line=dict(color='#ffd700', width=2)))
-                ozet.append({"Varlık": "Altın (TL)", "Başlangıç": "100 TL", "Güncel": f"{a_norm.iloc[-1]:.2f} TL", "Getiri": f"{a_norm.iloc[-1]-100:+.2f}%"})
-
-            if "Gümüş (TL)" in kiyas_secenek and "SI=F" in veriler.columns and not kur.empty:
-                g_tl = veriler["SI=F"] * kur; g_norm = (g_tl / g_tl.iloc[0]) * 100
-                fig_k.add_trace(go.Scatter(x=g_tl.index, y=g_norm, name="Gümüş (TL)", line=dict(color='#c0c0c0', width=2)))
-                ozet.append({"Varlık": "Gümüş (TL)", "Başlangıç": "100 TL", "Güncel": f"{g_norm.iloc[-1]:.2f} TL", "Getiri": f"{g_norm.iloc[-1]-100:+.2f}%"})
-
-            if "Dolar/TL" in kiyas_secenek and not kur.empty:
-                k_norm = (kur / kur.iloc[0]) * 100
-                fig_k.add_trace(go.Scatter(x=kur.index, y=k_norm, name="Dolar/TL", line=dict(color='#88ff88', width=2)))
-                ozet.append({"Varlık": "Dolar/TL", "Başlangıç": "100 TL", "Güncel": f"{k_norm.iloc[-1]:.2f} TL", "Getiri": f"{k_norm.iloc[-1]-100:+.2f}%"})
-
-            if "Enflasyon" in kiyas_secenek:
-                enf = {2020:0.14,2021:0.19,2022:0.72,2023:0.65,2024:0.55,2025:0.45,2026:0.35}
-                cum = [100]; val = 100
-                for i in range(1, len(veriler.index)):
-                    val *= (1 + enf.get(veriler.index[i].year, 0.45)) ** (1/252); cum.append(val)
-                fig_k.add_trace(go.Scatter(x=veriler.index, y=cum, name="Enflasyon", line=dict(color='#ff4444', width=1.5, dash='dot')))
-                ozet.append({"Varlık": "Enflasyon", "Başlangıç": "100 TL", "Güncel": f"{cum[-1]:.2f} TL", "Getiri": f"{cum[-1]-100:+.2f}%"})
-
-            fig_k.update_layout(title=f"100 TL Yatırımın Performansı — {t_sure_etiket}", template="plotly_dark",
-                plot_bgcolor='#0a0a0f', paper_bgcolor='#0a0a0f', yaxis_title="Değer (TL)", height=420,
-                legend=dict(bgcolor='#0f1520', bordercolor='#1e2a3a', font=dict(family='JetBrains Mono', size=11)),
-                font=dict(family='JetBrains Mono', color='#8899aa'), margin=dict(l=10, r=10, t=40, b=10))
-            fig_k.update_xaxes(gridcolor='#1e2a3a'); fig_k.update_yaxes(gridcolor='#1e2a3a')
-            st.plotly_chart(fig_k, use_container_width=True)
-            st.markdown('<div class="section-title">PERFORMANS ÖZETİ</div>', unsafe_allow_html=True)
-            st.dataframe(pd.DataFrame(ozet), use_container_width=True, hide_index=True)
-        else:
-            st.warning("Yeterli veri bulunamadı.")
-    else:
-        st.info("Sol panelden karşılaştırmak istediğiniz varlıkları seçin.")
-
-# ============================================================
-# TAB 5: PORTFÖY
-# ============================================================
-with tab5:
     st.markdown('<div class="section-title">💼 GELİŞMİŞ PORTFÖY TAKİBİ</div>', unsafe_allow_html=True)
 
     if not st.session_state.user:
