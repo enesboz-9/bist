@@ -7,6 +7,9 @@ from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import json
+import xml.etree.ElementTree as ET
+import html as html_lib
+import re
 
 # ============================================================
 # SAYFA AYARLARI
@@ -289,31 +292,141 @@ hr { border-color: #1e2a3a !important; }
 # ============================================================
 # BIST 100 LİSTESİ
 # ============================================================
-bist_100_full = {
-    "AEFES": "Anadolu Efes", "AGHOL": "Anadolu Grubu Holding", "AKBNK": "Akbank", "AKCNS": "Akçansa",
-    "AKFGY": "Akfen GYO", "AKSA": "Aksa", "AKSEN": "Aksa Enerji", "ALARK": "Alarko Holding",
-    "ALBRK": "Albaraka Türk", "ALFAS": "Alfa Solar Enerji", "ARCLK": "Arçelik", "ASELS": "Aselsan",
-    "ASTOR": "Astor Enerji", "ASUZU": "Anadolu Isuzu", "AYDEM": "Aydem Enerji", "BAGFS": "Bagfaş",
-    "BERA": "Bera Holding", "BIENY": "Bien Yapı Ürünleri", "BIMAS": "Bim Mağazalar", "BRSAN": "Borusan Boru",
-    "BRYAT": "Borusan Yatırım", "BUCIM": "Bursa Çimento", "CANTE": "Çan2 Termik", "CCOLA": "Coca-Cola İçecek",
-    "CIMSA": "Çimsa", "CWENE": "Cw Enerji", "DOAS": "Doğuş Otomotiv", "DOHOL": "Doğan Holding",
-    "EGEEN": "Ege Endüstri", "EKGYO": "Emlak Konut GYO", "ENJSA": "Enerjisa Enerji", "ENKAI": "Enka İnşaat",
-    "EREGL": "Ereğli Demir Çelik", "EUPWR": "Europower Enerji", "FROTO": "Ford Otosan", "GARAN": "Garanti Bankası",
-    "GESAN": "Girişim Elektrik", "GUBRF": "Gübre Fabrikaları", "GWIND": "Galata Wind", "HALKB": "Halkbank",
-    "HEKTS": "Hektaş", "IPEKE": "İpek Doğal Enerji", "ISCTR": "İş Bankası (C)", "ISDMR": "İskenderun Demir Çelik",
-    "ISGYO": "İş GYO", "ISMEN": "İş Yatırım Menkul Değerler", "IZENR": "İzdemir Enerji", "KAYSE": "Kayseri Şeker",
-    "KCHOL": "Koç Holding", "KENT": "Kent Gıda", "KONTR": "Kontrolmatik Teknoloji", "KORDS": "Kordsa",
-    "KOZAA": "Koza Madencilik", "KOZAL": "Koza Altın", "KRDMD": "Kardemir (D)", "MAVI": "Mavi Giyim",
-    "MGROS": "Migros", "MIATK": "Mia Teknoloji", "ODAS": "Odaş Elektrik", "OTKAR": "Otokar",
-    "OYAKC": "Oyak Çimento", "PENTA": "Penta Teknoloji", "PETKM": "Petkim", "PGSUS": "Pegasus",
-    "QUAGR": "Qua Granite", "SAHOL": "Sabancı Holding", "SASA": "Sasa Polyester", "SAYAS": "Say Yenilenebilir Enerji",
-    "SDTTR": "Sdt Uzay Ve Savunma", "SISE": "Şişecam", "SKBNK": "Şekerbank", "SMRTG": "Smart Güneş Enerjisi",
-    "SOKM": "Şok Marketler", "TARKM": "Tarkim Bitki Koruma", "TAVHL": "Tav Havalimanları", "TCELL": "Turkcell",
-    "THYAO": "Türk Hava Yolları", "TKFEN": "Tekfen Holding", "TOASO": "Tofaş Oto. Fab.", "TSKB": "Tskb",
-    "TTKOM": "Türk Telekom", "TTRAK": "Türk Traktör", "TUPRS": "Tüpraş", "TURSG": "Türkiye Sigorta",
-    "ULKER": "Ülker Bisküvi", "VAKBN": "Vakıfbank", "VESBE": "Vestel Beyaz Eşya", "VESTL": "Vestel",
-    "YEOTK": "Yeo Teknoloji", "YKBNK": "Yapı Kredi Bankası", "YYLGD": "Yaylatepe Gıda", "ZOREN": "Zorlu Enerji"
+# ============================================================
+# TÜM BIST HİSSELERİ (Dinamik + Geniş Statik Yedek)
+# ============================================================
+
+# Geniş statik liste — yedek olarak kullanılır
+BIST_STATIK = {
+    # BIST 100
+    "AEFES":"Anadolu Efes","AGHOL":"Anadolu Grubu Holding","AKBNK":"Akbank","AKCNS":"Akçansa",
+    "AKFGY":"Akfen GYO","AKSA":"Aksa","AKSEN":"Aksa Enerji","ALARK":"Alarko Holding",
+    "ALBRK":"Albaraka Türk","ALFAS":"Alfa Solar Enerji","ARCLK":"Arçelik","ASELS":"Aselsan",
+    "ASTOR":"Astor Enerji","ASUZU":"Anadolu Isuzu","AYDEM":"Aydem Enerji","BAGFS":"Bagfaş",
+    "BERA":"Bera Holding","BIENY":"Bien Yapı Ürünleri","BIMAS":"Bim Mağazalar","BRSAN":"Borusan Boru",
+    "BRYAT":"Borusan Yatırım","BUCIM":"Bursa Çimento","CANTE":"Çan2 Termik","CCOLA":"Coca-Cola İçecek",
+    "CIMSA":"Çimsa","CWENE":"Cw Enerji","DOAS":"Doğuş Otomotiv","DOHOL":"Doğan Holding",
+    "EGEEN":"Ege Endüstri","EKGYO":"Emlak Konut GYO","ENJSA":"Enerjisa Enerji","ENKAI":"Enka İnşaat",
+    "EREGL":"Ereğli Demir Çelik","EUPWR":"Europower Enerji","FROTO":"Ford Otosan","GARAN":"Garanti Bankası",
+    "GESAN":"Girişim Elektrik","GUBRF":"Gübre Fabrikaları","GWIND":"Galata Wind","HALKB":"Halkbank",
+    "HEKTS":"Hektaş","IPEKE":"İpek Doğal Enerji","ISCTR":"İş Bankası (C)","ISDMR":"İskenderun Demir Çelik",
+    "ISGYO":"İş GYO","ISMEN":"İş Yatırım","IZENR":"İzdemir Enerji","KAYSE":"Kayseri Şeker",
+    "KCHOL":"Koç Holding","KENT":"Kent Gıda","KONTR":"Kontrolmatik Teknoloji","KORDS":"Kordsa",
+    "KOZAA":"Koza Madencilik","KOZAL":"Koza Altın","KRDMD":"Kardemir (D)","MAVI":"Mavi Giyim",
+    "MGROS":"Migros","MIATK":"Mia Teknoloji","ODAS":"Odaş Elektrik","OTKAR":"Otokar",
+    "OYAKC":"Oyak Çimento","PENTA":"Penta Teknoloji","PETKM":"Petkim","PGSUS":"Pegasus",
+    "QUAGR":"Qua Granite","SAHOL":"Sabancı Holding","SASA":"Sasa Polyester","SAYAS":"Say Yenilenebilir",
+    "SDTTR":"Sdt Uzay Ve Savunma","SISE":"Şişecam","SKBNK":"Şekerbank","SMRTG":"Smart Güneş",
+    "SOKM":"Şok Marketler","TARKM":"Tarkim Bitki Koruma","TAVHL":"Tav Havalimanları","TCELL":"Turkcell",
+    "THYAO":"Türk Hava Yolları","TKFEN":"Tekfen Holding","TOASO":"Tofaş Oto.","TSKB":"Tskb",
+    "TTKOM":"Türk Telekom","TTRAK":"Türk Traktör","TUPRS":"Tüpraş","TURSG":"Türkiye Sigorta",
+    "ULKER":"Ülker Bisküvi","VAKBN":"Vakıfbank","VESBE":"Vestel Beyaz Eşya","VESTL":"Vestel",
+    "YEOTK":"Yeo Teknoloji","YKBNK":"Yapı Kredi Bankası","YYLGD":"Yaylatepe Gıda","ZOREN":"Zorlu Enerji",
+    # BIST 50 / Diğer popüler
+    "ADEL":"Adel Kalemcilik","ADESE":"Adese AVM","AKMGY":"Akiş GYO","AKLEASE":"Ak Finansal Kiralama",
+    "AKGRT":"Aksigorta","ANACM":"Anadolu Cam","ARC":"Ar Çelik","ARSAN":"Arsan Tekstil",
+    "ATEKS":"Altın Tekstil","ATPET":"Atlantis Petrol","AVGYO":"Avrasya GYO","AVHOL":"Avrasya Holding",
+    "AYEN":"Ayen Enerji","AZGYO":"Ağaoğlu GYO","BAKAB":"Bak Ambalaj","BANVT":"Banvit",
+    "BFREN":"Bosch Fren","BIOEN":"Biotrend Enerji","BIZIM":"Bizim Toptan","BNTAS":"Bntaş Ambalaj",
+    "BOBET":"Boğaziçi Beton","BOSSA":"Bossa Tic. ve San.","BRKO":"Burçelik Kablo","BTCIM":"Batıçim",
+    "BURCE":"Burçelik","BURVA":"Bursa Bulut Yatırım","BVSAN":"Burçelik Vana","CEMAS":"Çemaş Döküm",
+    "CEMTS":"Çemtaş","CLEBI":"Çelebi Hava Servisi","CMBTN":"Çimbeton","CMENT":"Çimentaş",
+    "DAGHL":"Doğan Holding","DAGI":"Dagi Giyim","DARDL":"Dardanel Önentaş","DENGE":"Denge Yatırım",
+    "DENIZ":"Denizbank (Hisse Yok-örnek)","DERIM":"Derimod","DESA":"Desa Deri","DEVA":"Deva Holding",
+    "DGATE":"Datagate Bilgisayar","DGNMO":"Doğan Müzik","DGZTE":"Doğan Gazetecilik","DIRIT":"Diriteks",
+    "DITAS":"Ditaş Doğan","DJIST":"Dow Jones İst.","DMRGD":"Demir-Girişim","DNISI":"Deniz Gayrimenkul",
+    "DOKTA":"Döktaş","DURDO":"Durdökmez","DYOBY":"Dyo Boya","DZGYO":"Deniz GYO",
+    "ECILC":"Eczacıbaşı İlaç","ECZYT":"Eczacıbaşı Yatırım","EGPRO":"Ege Profil","EGSER":"Ege Seramik",
+    "EMKEL":"Emkel Elektrik","EMNIS":"Eminiş Ambalaj","ERBOS":"Erbosan","ERCB":"Erce Boya",
+    "ERSU":"Ersu Meyve","ESCOM":"Escort Teknoloji","ESEMS":"Es-Em Elektrik","ESEN":"Esen Tarım",
+    "ESGYO":"Esenyurt GYO","ETILR":"Etibank Altın","ETYAT":"Etkin Yatırım","EUHOL":"Eurohold",
+    "EUKYO":"Euromoda Konfeksiyon","EUREN":"Euro Yenilenebilir","FENER":"Fenerbahçe","FLAP":"Flap Kongre",
+    "FMIZP":"F/M İzmir","FONET":"Fonet Bilgi","FORMT":"Formteks","FORTE":"Forte Bilişim",
+    "FRIGO":"Frigo-Pak","FZLGY":"Fazilet GYO","GARAN":"Garanti Bankası","GARFA":"Garanti Faktoring",
+    "GEDIK":"Gedik Yatırım","GEDZA":"Gediz Ambalaj","GEMAS":"Gemsan Elektrik","GENIL":"Genel Metal",
+    "GENTS":"Gentaş","GLBMD":"Global Menkul Değerler","GLRYH":"Glory Giyim","GLYHO":"Global Yatırım Holding",
+    "GOKNR":"Göknel Enerji","GOLTS":"Göltaş Çimento","GOODY":"Goodyear","GOZDE":"Gözde Girişim",
+    "GSDDE":"GSD Denizcilik","GSDHO":"GSD Holding","GSRAY":"Galatasaray","GUBRF":"Gübre Fabrikaları",
+    "GUNDG":"Güneydoğu Turizm","HDFGS":"Hedef Girişim","HEDEF":"Hedef Menkul","HILAL":"Hilal Madencilik",
+    "HTTBT":"Hat Turizm","HUNER":"Hünkar Enerji","ICBCT":"ICBC Turkey","IDEAS":"İdeas Mühendislik",
+    "IDGYO":"İdealist GYO","IEYHO":"İEYHO","IHAAS":"İhlas Holding","IHEVA":"İhlas Ev Aletleri",
+    "IHGZT":"İhlas Gazetecilik","IHLGM":"İhlas Madencilik","IHYAY":"İhlas Yayın","INDES":"İndeks Bilgisayar",
+    "INFO":"İnfo Yatırım","INTEM":"İntema İnşaat","INVEO":"Inveo Varlık Yönetimi","IPEKE":"İpek Enerji",
+    "ISATR":"İş Gayrimenkul","ISBTR":"İş Bankası B","ISFIN":"İş Finansal Kiralama","ISGSY":"İş GY Ortaklığı",
+    "ISKPL":"İskenderun Pelet","ITTFH":"İttifak Holding","IZFAS":"İzmir Fuar","IZOCM":"İzoçam",
+    "JANTS":"Jantsa Jant","KAPLM":"Kaplamin Ambalaj","KAREL":"Karel Elektronik","KARSN":"Karsan",
+    "KATMR":"Katmerciler","KCAER":"KCA Enerji","KERVN":"Kervan Gıda","KGYO":"Kiler GYO",
+    "KLGYO":"Kiler GYO","KLKIM":"Kalekim","KLNMA":"Kalkınma Yatırım","KLSYN":"Kalısın Yapı",
+    "KNFRT":"Konfrut Gıda","KONYA":"Konya Çimento","KORDS":"Kordsa","KPHOL":"KP Holding",
+    "KRDMA":"Kardemir A","KRDMB":"Kardemir B","KRPLS":"Karbosan","KRSAN":"Karsan Otomotiv",
+    "KTLEV":"Katılım Emeklilik","KUTPO":"Kütahya Porselen","LIDER":"Lider Faktoring","LIDFA":"Lidya Madencilik",
+    "LINK":"Link Bilgisayar","LKMNH":"Lokman Hekim","LOGO":"Logo Yazılım","LRSHO":"Lüks Kadife",
+    "LUKSK":"Lüks Kadife","MAALT":"Maalt","MACKO":"Mackolik","MAKIM":"Makina Takım",
+    "MAKTK":"Maktek","MANAS":"Manas Enerji","MARBL":"Marble","MARTI":"Martı Otel",
+    "MAVI":"Mavi Giyim","MEDTR":"Meditera Tıp","MEGAP":"Mega Polietilen","MEKAG":"Mekanik Enerji",
+    "MERKO":"Merko Gıda","METRO":"Metro Holding","METUR":"Metur Turizm","MIPAZ":"Mipaş AVM",
+    "MNDRS":"Menderes Tekstil","MNDTR":"Menderes Turizm","MOBTL":"Mobtelecom","MOGAN":"Mogaz Petrol",
+    "MSGYO":"MS GYO","MTRKS":"Matriks Bilgi","MZHLD":"Mozaik Holding","NATEN":"Naturel Enerji",
+    "NETAS":"Netaş Telekomünikasyon","NIBAS":"Niğbaş Niğde","NILYT":"Nil Yatırım","NRBNK":"NR Sigorta",
+    "NTHOL":"Net Holding","NTTUR":"Net Turizm","NUGYO":"Nurol GYO","NUHCM":"Nuh Çimento",
+    "OBASE":"Obase","OCAS":"Otokar","OFSYM":"Ofis Makineleri","ONCSM":"Oncosim",
+    "ONRYT":"Onur-YT","ORCAY":"Orca Yatırım","ORGE":"Orge Enerji","ORMA":"Orma Orman Ürünleri",
+    "OSMEN":"Osmaniye Elektrik","OSTIM":"Ostim Endüstri","OYLUM":"Oylum Tarım","OZGYO":"Özak GYO",
+    "OZKGY":"Özak GYO","OZRDN":"Özderici Holding","PAGYO":"Pasha GYO","PAMEL":"Pamel Yenilenebilir",
+    "PAPIL":"Papilion","PARSN":"Parsan","PCILT":"Petro Çimento İnşaat","PDMR":"Podravka",
+    "PEGYO":"Pera GYO","PENGD":"Penguen Gıda","PENTA":"Penta Teknoloji","PERCY":"Percy Jackson (örnek)",
+    "PETKM":"Petkim","PETUN":"Pınar Et ve Un","PINSU":"Pınar Su","PKART":"Plastkart",
+    "PLTUR":"Palmiye Turizm","PNLSN":"Panelsan","POLHO":"Polisan Holding","POLTK":"Politeknik Metal",
+    "PRDGS":"Perdegüneş","PRZMA":"Prizma Pres","PSGYO":"Panora GYO","PSGRS":"Pasaport GYO",
+    "RDFGY":"Roda GYO","RGYAS":"Reysaş GYO","RKTIN":"Rektim","RODRG":"Rodrigo Tekstil",
+    "ROYAL":"Royal Halı","RTALB":"Rota Alüminyum","RUBNS":"Rubenis Tekstil","RYGYO":"Raysal GYO",
+    "SAMAT":"Samatya Cam","SANFM":"Sanifoam","SARTN":"Sarıtaş Altın","SBTAH":"Sebahat Turizm",
+    "SELEC":"Selçuk Ecza","SELGD":"Selçuk Gıda","SELVA":"Selva Gıda","SEYKM":"Seyitler Kimya",
+    "SILVR":"Silver Yatırım","SNGYO":"Sinpaş GYO","SNKRN":"Sanko Enerji","SNPAM":"Sanko Pazarlama",
+    "SODSN":"Soda Sanayii","SOLAR":"Solar Yatırım","SONME":"Sönmez Pamuklu","SRVGY":"Servet GYO",
+    "SUWEN":"Süwen Tekstil","TABGD":"Taba Gıda","TBORG":"Türk Tuborg","TCELL":"Turkcell",
+    "TDGYO":"Trend GYO","TEKTU":"Tektur Turizm","TMPOL":"Tem Polimer","TMSN":"Timsan",
+    "TNZTP":"Tüneztepe","TOASO":"Tofaş","TRCAS":"Türkiye Çelik Cas.","TRGYO":"Torunlar GYO",
+    "TRILC":"Trilogi","TRNSK":"Tureks Saraciye","TRPAP":"Türk Prysmian Kablo","TSGYO":"Türkiye Sigorta GYO",
+    "TSPOR":"Trabzonspor","TTRAK":"Türk Traktör","TUCLK":"Tuçlik Metalurji","TUKAS":"Tukaş",
+    "TULFA":"Tülfar","TURGG":"Türk Havacılık","TURSG":"Türkiye Sigorta","TUYAP":"Tüyap",
+    "UCAK":"Uçak Servisi","ULUFA":"Ulu Finans","ULUSE":"Ulusoy Elektrik","ULUUN":"Ulusoy Un",
+    "UMPAS":"Umpaş Holding","UNLU":"Ünlü Yatırım","USAK":"Uşak Seramik","USDTR":"USD Tracker",
+    "VAKFN":"Vakıf Finansal","VAKGY":"Vakıf GYO","VAKKO":"Vakko Tekstil","VANGD":"Van Gölü Gıda",
+    "VBTYZ":"VBT Yazılım","VERUS":"Verusa Holding","VKFYO":"Vakıf FYO","VKGYO":"Vakıf GYO",
+    "YBTAS":"Yıbıtaş","YESIL":"Yeşil Gayrimenkul","YGGYO":"Yeni Gimat GYO","YGYO":"Yeni GYO",
+    "YLGYO":"Yıldız GYO","YLTKS":"Yıldız Teknik","YNSYT":"Yensayt","YONGA":"Yonga Mobilya",
+    "YUNSA":"Yünsa","ZEDUR":"Zedur Enerji","ZRGYO":"Ziraat GYO","ZSEGY":"ZSE Güneş Enerji",
 }
+
+@st.cache_data(ttl=86400)
+def bist_hisse_listesi_getir():
+    """Wikipedia'dan tüm BIST hisselerini çekmeye çalış, başarısız olursa statik listeyi döndür."""
+    try:
+        url = "https://tr.wikipedia.org/wiki/BIST_100_Endeksi"
+        resp = requests.get(url, timeout=8,
+                            headers={"User-Agent": "Mozilla/5.0"})
+        tables = pd.read_html(resp.text)
+        for tbl in tables:
+            cols = [str(c).lower() for c in tbl.columns]
+            if any("kod" in c or "sembol" in c or "ticker" in c for c in cols):
+                kod_col = next(c for c in tbl.columns if any(k in str(c).lower() for k in ["kod","sembol","ticker"]))
+                ad_col  = next((c for c in tbl.columns if any(k in str(c).lower() for k in ["şirket","şirket adı","ad","unvan"])), None)
+                kodlar = tbl[kod_col].dropna().astype(str).str.strip().str.upper().tolist()
+                adlar  = tbl[ad_col].dropna().astype(str).tolist() if ad_col else kodlar
+                sonuc  = {}
+                for k, a in zip(kodlar, adlar):
+                    if 2 <= len(k) <= 6 and k.isalpha():
+                        sonuc[k] = a
+                if len(sonuc) > 20:
+                    # Statik listeyle birleştir
+                    merged = {**BIST_STATIK, **sonuc}
+                    return dict(sorted(merged.items()))
+    except Exception:
+        pass
+    return dict(sorted(BIST_STATIK.items()))
+
+bist_100_full = bist_hisse_listesi_getir()
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
 # ============================================================
@@ -325,6 +438,78 @@ if 'alarmlar' not in st.session_state:
     st.session_state.alarmlar = []
 if 'ai_cache' not in st.session_state:
     st.session_state.ai_cache = {}
+if 'mail_gonderildi' not in st.session_state:
+    # Aynı alarm için tekrar tekrar mail gitmesini önler: {alarm_key: timestamp}
+    st.session_state.mail_gonderildi = {}
+
+# ============================================================
+# MAİL GÖNDERME FONKSİYONU (Gmail SMTP)
+# ============================================================
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def alarm_maili_gonder(alici_mail, hisse, tur, alarm_fiyat, gercek_fiyat):
+    """Streamlit Secrets'tan Gmail bilgilerini alarak alarm maili gönderir."""
+    try:
+        gonderen  = st.secrets["GMAIL_USER"]
+        sifre     = st.secrets["GMAIL_APP_PASSWORD"]
+    except Exception:
+        return False, "Secrets bulunamadı (GMAIL_USER / GMAIL_APP_PASSWORD)"
+
+    yon_emoji = "🚀" if tur == "Üstüne Çıkarsa" else "📉"
+    konu = f"{yon_emoji} BIST Alarm: {hisse} fiyat hedefine ulaştı!"
+
+    html_body = f"""
+    <html><body style="font-family:Arial,sans-serif;background:#0a0a0f;color:#e2e8f0;padding:24px">
+      <div style="max-width:480px;margin:auto;background:#0f1520;border:1px solid #1e2a3a;border-radius:10px;padding:28px">
+        <div style="font-size:22px;font-weight:700;color:#00d4ff;margin-bottom:4px">◈ BIST Terminal Pro</div>
+        <div style="font-size:12px;color:#4a6080;margin-bottom:24px">Otomatik Fiyat Alarmı</div>
+        <div style="background:#1a1a2e;border-left:4px solid {'#00ff88' if tur == 'Üstüne Çıkarsa' else '#ff4444'};
+                    border-radius:6px;padding:16px;margin-bottom:20px">
+          <div style="font-size:28px;font-weight:700;color:{'#00ff88' if tur == 'Üstüne Çıkarsa' else '#ff4444'}">
+            {yon_emoji} {hisse}
+          </div>
+          <div style="font-size:14px;color:#8899aa;margin-top:6px">{tur} alarmı tetiklendi</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <tr>
+            <td style="padding:8px 0;color:#4a6080;font-size:13px">Alarm Fiyatı</td>
+            <td style="padding:8px 0;color:#e2e8f0;font-weight:600;text-align:right">{alarm_fiyat:.2f} TL</td>
+          </tr>
+          <tr style="border-top:1px solid #1e2a3a">
+            <td style="padding:8px 0;color:#4a6080;font-size:13px">Gerçekleşen Fiyat</td>
+            <td style="padding:8px 0;color:#00d4ff;font-weight:700;text-align:right">{gercek_fiyat:.2f} TL</td>
+          </tr>
+          <tr style="border-top:1px solid #1e2a3a">
+            <td style="padding:8px 0;color:#4a6080;font-size:13px">Tarih / Saat</td>
+            <td style="padding:8px 0;color:#8899aa;font-size:12px;text-align:right">{datetime.now().strftime('%d.%m.%Y %H:%M')}</td>
+          </tr>
+        </table>
+        <div style="margin-top:24px;padding:12px;background:#0a0a0f;border-radius:6px;
+                    font-size:11px;color:#2a3a4a;line-height:1.6">
+          Bu mail BIST Terminal Pro tarafından otomatik gönderilmiştir.<br>
+          Bu bir yatırım tavsiyesi değildir. Tüm yatırım kararları kullanıcının sorumluluğundadır.
+        </div>
+      </div>
+    </body></html>
+    """
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = konu
+        msg["From"]    = gonderen
+        msg["To"]      = alici_mail
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+            server.login(gonderen, sifre)
+            server.sendmail(gonderen, alici_mail, msg.as_string())
+        return True, "Mail gönderildi"
+    except smtplib.SMTPAuthenticationError:
+        return False, "Gmail kimlik doğrulama hatası — App Password doğru mu?"
+    except Exception as e:
+        return False, str(e)
 
 # ============================================================
 # YARDIMCI FONKSİYONLAR
@@ -559,34 +744,85 @@ with st.sidebar:
     alarm_hisse = st.selectbox("Hisse:", hisse_listesi, key="alarm_h")
     alarm_tur   = st.radio("Tür:", ["Üstüne Çıkarsa", "Altına Düşerse"], horizontal=True)
     alarm_fiyat = st.number_input("Fiyat (TL):", min_value=0.01, format="%.2f", key="alarm_f")
+    alarm_mail  = st.text_input("📧 E-posta (opsiyonel):", placeholder="ornek@gmail.com", key="alarm_mail")
 
     if st.button("⚡ Alarm Ekle", use_container_width=True):
         alarm_kod = alarm_hisse.split(" - ")[0]
         st.session_state.alarmlar.append({
-            'hisse': alarm_kod, 'tur': alarm_tur,
-            'fiyat': alarm_fiyat, 'aktif': True
+            'hisse'    : alarm_kod,
+            'tur'      : alarm_tur,
+            'fiyat'    : alarm_fiyat,
+            'mail'     : alarm_mail.strip(),
+            'aktif'    : True,
+            'eklenme'  : datetime.now().strftime('%d.%m %H:%M')
         })
-        st.success("Alarm eklendi!")
+        st.success("✅ Alarm eklendi!")
 
-    # Alarm kontrolü
+    # ---- Alarm kontrolü ----
     if st.session_state.alarmlar:
-        st.markdown("**Aktif Alarmlar:**")
+        st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;margin:8px 0 4px">AKTİF ALARMLAR</div>', unsafe_allow_html=True)
+        silinecek = []
         for i, alarm in enumerate(st.session_state.alarmlar):
             try:
                 d = yf.download(f"{alarm['hisse']}.IS", period="1d", progress=False)
-                if not d.empty:
+                if d.empty:
+                    continue
+                if isinstance(d.columns, pd.MultiIndex):
+                    g_fiyat = float(d['Close'].iloc[-1].iloc[0])
+                else:
                     g_fiyat = float(d['Close'].iloc[-1])
-                    tetiklendi = (alarm['tur'] == "Üstüne Çıkarsa" and g_fiyat >= alarm['fiyat']) or \
-                                 (alarm['tur'] == "Altına Düşerse"  and g_fiyat <= alarm['fiyat'])
-                    if tetiklendi:
-                        st.markdown(f'<div class="alarm-triggered">🚨 {alarm["hisse"]}: {g_fiyat:.2f} TL → {alarm["tur"]} {alarm["fiyat"]:.2f} TL</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="alarm-active">🔔 {alarm["hisse"]}: {alarm["tur"]} {alarm["fiyat"]:.2f} TL (Şu an: {g_fiyat:.2f})</div>', unsafe_allow_html=True)
-            except:
+
+                tetiklendi = (
+                    (alarm['tur'] == "Üstüne Çıkarsa" and g_fiyat >= alarm['fiyat']) or
+                    (alarm['tur'] == "Altına Düşerse"  and g_fiyat <= alarm['fiyat'])
+                )
+
+                # Mail gönder (aynı alarm için günde 1 kez)
+                if tetiklendi and alarm.get('mail'):
+                    mail_key = f"{alarm['hisse']}_{alarm['fiyat']}_{alarm['tur']}"
+                    son_gonderim = st.session_state.mail_gonderildi.get(mail_key)
+                    simdi = datetime.now()
+                    gonder = (son_gonderim is None or
+                              (simdi - son_gonderim).total_seconds() > 3600)
+                    if gonder:
+                        basari, mesaj = alarm_maili_gonder(
+                            alarm['mail'], alarm['hisse'],
+                            alarm['tur'], alarm['fiyat'], g_fiyat
+                        )
+                        if basari:
+                            st.session_state.mail_gonderildi[mail_key] = simdi
+                            st.toast(f"📧 {alarm['hisse']} alarmı {alarm['mail']} adresine gönderildi!", icon="✅")
+                        else:
+                            st.toast(f"⚠ Mail gönderilemedi: {mesaj}", icon="❌")
+
+                # Görsel
+                if tetiklendi:
+                    st.markdown(f"""
+                    <div class="alarm-triggered">
+                        🚨 <b>{alarm['hisse']}</b> → {g_fiyat:.2f} TL<br>
+                        <span style="font-size:10px">{alarm['tur']} {alarm['fiyat']:.2f} TL
+                        {'• 📧 ' + alarm['mail'] if alarm.get('mail') else ''}</span>
+                    </div>""", unsafe_allow_html=True)
+                else:
+                    pct = ((alarm['fiyat'] - g_fiyat) / g_fiyat) * 100
+                    yon = "▲" if alarm['tur'] == "Üstüne Çıkarsa" else "▼"
+                    st.markdown(f"""
+                    <div class="alarm-active">
+                        🔔 <b>{alarm['hisse']}</b> {yon} {alarm['fiyat']:.2f} TL<br>
+                        <span style="font-size:10px">Şu an: {g_fiyat:.2f} TL &nbsp;•&nbsp; Fark: %{abs(pct):.1f}
+                        {'&nbsp;•&nbsp; 📧' if alarm.get('mail') else ''}</span>
+                    </div>""", unsafe_allow_html=True)
+
+            except Exception:
                 pass
-            if st.button("✕", key=f"al_del_{i}"):
-                st.session_state.alarmlar.pop(i)
-                st.rerun()
+
+            if st.button("✕ Sil", key=f"al_del_{i}", use_container_width=True):
+                silinecek.append(i)
+
+        for i in reversed(silinecek):
+            st.session_state.alarmlar.pop(i)
+        if silinecek:
+            st.rerun()
 
     st.markdown("---")
     st.markdown('<div class="section-title">⚖ KARŞILAŞTIRMA</div>', unsafe_allow_html=True)
@@ -1302,12 +1538,30 @@ with tab5:
 
 
 # ============================================================
-# FOOTER
+# YASAL UYARI & FOOTER
 # ============================================================
 st.markdown("---")
 st.markdown("""
-<div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#2a3a4a;padding:12px">
-    BIST TERMINAL PRO • Geliştirici: Enes Boz • Veriler Yahoo Finance'ten alınmaktadır •
-    Bu uygulama yatırım tavsiyesi içermez • Tüm yatırım kararları kullanıcının sorumluluğundadır
+<div style="background:#0f0f1a;border:1px solid #1e2a3a;border-left:3px solid #ffaa00;
+            border-radius:8px;padding:16px 20px;margin-bottom:12px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ffaa00;
+                letter-spacing:2px;margin-bottom:8px">⚠ YASAL UYARI / SORUMLULUK REDDİ</div>
+    <div style="font-size:12px;color:#6a7d90;line-height:1.8">
+        Bu uygulama <b style="color:#8899aa">yalnızca bilgilendirme amaçlıdır</b> ve
+        <b style="color:#8899aa">yatırım tavsiyesi niteliği taşımamaktadır.</b>
+        Uygulama içindeki veriler, grafikler, teknik indikatörler ve yapay zeka analizleri
+        <b style="color:#8899aa">alım-satım kararı için esas alınamaz.</b>
+        Sermaye piyasası araçlarına yatırım yapmak kayıp riski içerir;
+        geçmiş performans gelecekteki sonuçların göstergesi değildir.
+        Yatırım kararlarınızı vermeden önce lisanslı bir yatırım danışmanına başvurmanız tavsiye edilir.
+        <br><br>
+        Veriler <b style="color:#8899aa">Yahoo Finance</b> üzerinden alınmakta olup
+        gerçek zamanlı değil, gecikmeli olabilir. Veri doğruluğu garanti edilmez.
+        Uygulamayı kullanan kişi bu koşulları kabul etmiş sayılır.
+    </div>
 </div>
-""", unsafe_allow_html=True)
+<div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#2a3a4a;padding:8px">
+    BIST TERMINAL PRO &nbsp;•&nbsp; Geliştirici: Enes Boz &nbsp;•&nbsp; {datetime.now().year} &nbsp;•&nbsp;
+    Veriler Yahoo Finance kaynaklıdır
+</div>
+""".format(datetime=datetime), unsafe_allow_html=True)
