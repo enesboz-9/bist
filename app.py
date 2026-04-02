@@ -453,7 +453,7 @@ def teknik_sinyal_hesapla(seri, data):
 
 
 # ============================================================
-# AI ANALİZ FONKSİYONU (Anthropic API)
+# AI ANALİZ FONKSİYONU (Groq API)
 # ============================================================
 def ai_analiz_yap(kod, ad, fiyat, degisim, rsi, genel_sinyal, hacim_ort, seri):
     cache_key = f"{kod}_{datetime.now().strftime('%Y%m%d%H')}"
@@ -461,7 +461,12 @@ def ai_analiz_yap(kod, ad, fiyat, degisim, rsi, genel_sinyal, hacim_ort, seri):
         return st.session_state.ai_cache[cache_key]
 
     try:
-        son_7_gun = seri.iloc[-7:].pct_change().dropna() * 100
+        groq_key = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        return "⚠ Groq API key bulunamadı. Streamlit Cloud → Settings → Secrets bölümüne GROQ_API_KEY ekleyin."
+
+    try:
+        son_7_gun  = seri.iloc[-7:].pct_change().dropna() * 100
         trend_ozet = f"{son_7_gun.mean():.2f}% ort günlük değişim"
         yuksek_52h = seri.rolling(252).max().iloc[-1]
         dusuk_52h  = seri.rolling(252).min().iloc[-1]
@@ -485,25 +490,33 @@ Analizi şu başlıklar altında yaz (her biri 1-2 cümle, toplam max 150 kelime
 Türkçe yaz, profesyonel ve objektif ol. Kesin garanti verme, olasılık dilini kullan."""
 
         response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"Content-Type": "application/json"},
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {groq_key}"
+            },
             json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1000,
-                "messages": [{"role": "user", "content": prompt}]
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 1024,
+                "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": "Sen profesyonel bir Türk borsa analistisin. Türkçe, net ve objektif analiz yaparsın."},
+                    {"role": "user", "content": prompt}
+                ]
             },
             timeout=30
         )
 
         if response.status_code == 200:
             data = response.json()
-            text = "".join([b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"])
+            text = data["choices"][0]["message"]["content"]
             st.session_state.ai_cache[cache_key] = text
             return text
-    except Exception as e:
-        pass
+        else:
+            return f"⚠ Groq API hatası: {response.status_code} — {response.text[:200]}"
 
-    return None
+    except Exception as e:
+        return f"⚠ Bağlantı hatası: {str(e)}"
 
 
 # ============================================================
@@ -840,7 +853,7 @@ with tab2:
                 <div class="ai-box" style="text-align:center;color:#4a6080;padding:40px">
                     <div style="font-size:32px;margin-bottom:12px">🤖</div>
                     <div>AI analizi başlatmak için yukarıdaki butona tıklayın.</div>
-                    <div style="font-size:12px;margin-top:8px">Claude Sonnet modeli kullanılır • Saatlik önbellek</div>
+                    <div style="font-size:12px;margin-top:8px">Groq — Llama 3.3 70B modeli kullanılır • Saatlik önbellek</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -863,67 +876,139 @@ with tab2:
 
 
 # ============================================================
-# TAB 3: HABERLER
+# TAB 3: HABERLER (RSS FEED)
 # ============================================================
+
+import xml.etree.ElementTree as ET
+import html
+import re
+
+RSS_KAYNAKLAR = [
+    {"ad": "Investing.com TR",  "url": "https://tr.investing.com/rss/news.rss"},
+    {"ad": "Borsa Gündem",      "url": "https://www.borsagundem.com/feed"},
+    {"ad": "Para Analiz",       "url": "https://www.paraanaliz.com/feed/"},
+    {"ad": "Ekonomim",          "url": "https://www.ekonomim.com/rss.xml"},
+    {"ad": "Bloomberg HT",      "url": "https://www.bloomberght.com/rss"},
+]
+
+@st.cache_data(ttl=600)
+def rss_haberleri_cek(hisse_kodu):
+    """Birden fazla RSS kaynağından haberleri çek, hisse koduna göre filtrele."""
+    tum_haberler = []
+    pozitif_kw = ['artış', 'yüksel', 'rekor', 'büyüme', 'kâr', 'kazanç', 'güçlü', 'olumlu', 'yatırım', 'artı']
+    negatif_kw = ['düşüş', 'kayıp', 'zarar', 'risk', 'endişe', 'kriz', 'çöküş', 'olumsuz', 'baskı', 'sert']
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; BISTTerminal/1.0)"}
+
+    for kaynak in RSS_KAYNAKLAR:
+        try:
+            resp = requests.get(kaynak["url"], headers=headers, timeout=8)
+            if resp.status_code != 200:
+                continue
+            root = ET.fromstring(resp.content)
+            items = root.findall(".//item")
+            for item in items:
+                baslik = item.findtext("title", "").strip()
+                link   = item.findtext("link", "#").strip()
+                tarih  = item.findtext("pubDate", "").strip()
+                ozet   = item.findtext("description", "").strip()
+                # HTML tag temizle
+                ozet = re.sub(r'<[^>]+>', '', html.unescape(ozet))[:200]
+
+                # Hisse kodu veya genel borsa haberi filtresi
+                arama = baslik.lower() + ozet.lower()
+                hisse_eslesme = (
+                    hisse_kodu.lower() in arama or
+                    "bist" in arama or "borsa" in arama or
+                    "hisse" in arama or "endeks" in arama or
+                    "piyasa" in arama or "ekonomi" in arama
+                )
+                if not hisse_eslesme:
+                    continue
+
+                # Tarih parse
+                try:
+                    from email.utils import parsedate_to_datetime
+                    dt = parsedate_to_datetime(tarih)
+                    tarih_str = dt.strftime("%d.%m.%Y %H:%M")
+                except:
+                    tarih_str = tarih[:16] if len(tarih) > 10 else "-"
+
+                # Duygu analizi
+                bl = baslik.lower()
+                sentiment = "news-neutral"
+                if any(k in bl for k in pozitif_kw): sentiment = "news-positive"
+                if any(k in bl for k in negatif_kw): sentiment = "news-negative"
+
+                tum_haberler.append({
+                    "baslik": baslik,
+                    "link": link,
+                    "kaynak": kaynak["ad"],
+                    "tarih": tarih_str,
+                    "ozet": ozet,
+                    "sentiment": sentiment
+                })
+        except Exception:
+            continue
+
+    # Tekrarları kaldır (başlığa göre)
+    goruldu = set()
+    benzersiz = []
+    for h in tum_haberler:
+        anahtar = h["baslik"][:60].lower()
+        if anahtar not in goruldu:
+            goruldu.add(anahtar)
+            benzersiz.append(h)
+
+    return benzersiz[:20]
+
+
 with tab3:
     st.markdown('<div class="section-title">📰 PİYASA HABERLERİ VE ANALİZ</div>', unsafe_allow_html=True)
 
     haber_kol1, haber_kol2 = st.columns([2, 1])
 
     with haber_kol1:
-        if st.button("🔄 Haberleri Yükle / Güncelle", use_container_width=True):
-            with st.spinner("Haberler yükleniyor..."):
-                try:
-                    ticker_obj = yf.Ticker(f"{t_kod}.IS")
-                    haberler = ticker_obj.news
+        h_btn_col, h_info_col = st.columns([1, 2])
+        with h_btn_col:
+            haber_yukle = st.button("🔄 Haberleri Yükle / Güncelle", use_container_width=True)
+        with h_info_col:
+            st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#4a6080;padding-top:10px">📡 Kaynak: Borsa RSS feed\'leri • 10 dk önbellek</div>', unsafe_allow_html=True)
 
-                    if haberler:
-                        st.session_state[f"haberler_{t_kod}"] = haberler
-                    else:
-                        # Genel piyasa haberleri için XU100 dene
-                        xu100 = yf.Ticker("XU100.IS")
-                        haberler = xu100.news
-                        st.session_state[f"haberler_{t_kod}"] = haberler if haberler else []
-                except Exception as e:
-                    st.session_state[f"haberler_{t_kod}"] = []
+        if haber_yukle:
+            with st.spinner(f"Haberler yükleniyor..."):
+                haberler = rss_haberleri_cek(t_kod)
+                st.session_state[f"rss_{t_kod}"] = haberler
 
-        haberler_cache = st.session_state.get(f"haberler_{t_kod}", None)
+        haberler_cache = st.session_state.get(f"rss_{t_kod}", None)
 
         if haberler_cache is not None:
             if haberler_cache:
-                for haber in haberler_cache[:10]:
-                    baslik = haber.get('title', 'Başlık yok')
-                    link   = haber.get('link', '#')
-                    kaynak = haber.get('publisher', 'Bilinmiyor')
-                    zaman  = haber.get('providerPublishTime', 0)
-                    if zaman:
-                        zaman_str = datetime.fromtimestamp(zaman).strftime('%d.%m.%Y %H:%M')
-                    else:
-                        zaman_str = '-'
-
-                    # Basit duygu analizi (keyword tabanlı)
-                    pozitif_kw = ['artış', 'yüksel', 'rekor', 'büyüme', 'kâr', 'kazanç', 'güçlü', 'olumlu', 'yatırım']
-                    negatif_kw = ['düşüş', 'kayıp', 'zarar', 'risk', 'endişe', 'kriz', 'çöküş', 'olumsuz', 'baskı']
-                    baslik_lower = baslik.lower()
-                    sentiment_cls = 'news-neutral'
-                    if any(kw in baslik_lower for kw in pozitif_kw): sentiment_cls = 'news-positive'
-                    if any(kw in baslik_lower for kw in negatif_kw): sentiment_cls = 'news-negative'
-
+                st.markdown(f'<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#4a6080;margin-bottom:12px">{len(haberler_cache)} haber bulundu</div>', unsafe_allow_html=True)
+                for haber in haberler_cache:
                     st.markdown(f"""
-                    <a href="{link}" target="_blank" style="text-decoration:none">
-                        <div class="news-card {sentiment_cls}">
-                            <div class="news-title">{baslik}</div>
-                            <div class="news-meta">📰 {kaynak} &nbsp;•&nbsp; 🕐 {zaman_str}</div>
+                    <a href="{haber['link']}" target="_blank" style="text-decoration:none">
+                        <div class="news-card {haber['sentiment']}">
+                            <div class="news-title">{haber['baslik']}</div>
+                            {'<div style="font-size:12px;color:#6a7d90;margin:4px 0">' + haber['ozet'] + '...</div>' if haber['ozet'] else ''}
+                            <div class="news-meta">📰 {haber['kaynak']} &nbsp;•&nbsp; 🕐 {haber['tarih']}</div>
                         </div>
                     </a>
                     """, unsafe_allow_html=True)
             else:
-                st.info(f"ℹ {t_kod} için haber bulunamadı. Bu hisse için Yahoo Finance haberi bulunmuyor olabilir.")
+                st.markdown(f"""
+                <div class="ai-box" style="text-align:center;color:#4a6080;padding:30px">
+                    <div style="font-size:28px;margin-bottom:10px">📭</div>
+                    <div>{t_kod} için haber bulunamadı.</div>
+                    <div style="font-size:11px;margin-top:6px">RSS kaynakları geçici olarak erişilemez olabilir.</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.markdown("""
             <div class="ai-box" style="text-align:center;color:#4a6080;padding:40px">
                 <div style="font-size:32px;margin-bottom:12px">📰</div>
                 <div>Haberleri görmek için yukarıdaki butona tıklayın.</div>
+                <div style="font-size:11px;margin-top:8px">Investing.com, Borsa Gündem, Bloomberg HT ve daha fazlasından çeker</div>
             </div>
             """, unsafe_allow_html=True)
 
