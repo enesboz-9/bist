@@ -7,18 +7,7 @@ from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import json
-import streamlit as st
-import streamlit.components.v1 as components
 
-# Bu kod, Google botunun siteye girdiğinde doğrulama kodunu 'görmesini' sağlar.
-components.html(
-    """
-    <head>
-        <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
-    </head>
-    """,
-    height=0,
-)
 # ============================================================
 # SAYFA AYARLARI
 # ============================================================
@@ -28,14 +17,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-components.html(
-    """
-    <head>
-        <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
-    </head>
-    """,
-    height=0,
-)
+
 # ============================================================
 # BLOOMBERG KARANLIK TEMA CSS
 # ============================================================
