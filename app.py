@@ -14,7 +14,8 @@ import streamlit.components.v1 as components
 # Bu kod Google botunun siteni tanımasını sağlar
 components.html(
     """
-    <meta name="google-site-verification" content="1d889bb8ce646ba3" />
+
+<meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
     """,
     height=0,
 )
