@@ -13,7 +13,9 @@ import streamlit.components.v1 as components
 # Bu kod, Google botunun siteye girdiğinde doğrulama kodunu 'görmesini' sağlar.
 components.html(
     """
-    <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
+    <head>
+        <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
+    </head>
     """,
     height=0,
 )
