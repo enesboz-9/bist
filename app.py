@@ -3,16 +3,20 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import streamlit as st
 
+# TEK BİR set_page_config OLMALIDIR:
 st.set_page_config(
-    page_title="HaberAI - Yapay Zeka Destekli Güncel Haber Analizi",
-    page_icon="📰",
-    layout="centered",
+    page_title="HaberAI & BIST Terminal - Enes Boz",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
     menu_items={
-        'About': "# HaberAI\nEn güncel haberleri yapay zeka ile analiz eden ücretsiz platform."
+        'Get Help': 'https://github.com/kullanici-adin', # Kendi linkini ekle
+        'About': "# HaberAI & BIST Terminal\nEnes Boz tarafından geliştirilen, BIST 100 verilerini analiz eden ve enflasyon karşısındaki değerini ölçen finans terminali."
     }
 )
+
+# Geri kalan kodların buradan devam etsin...
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(page_title="BIST Terminal - Enes Boz", layout="wide")
 
