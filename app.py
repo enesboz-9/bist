@@ -10,14 +10,25 @@ import json
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- GOOGLE SEARCH CONSOLE DOĞRULAMA ---
-# Bu kod Google botunun siteni tanımasını sağlar
+# --- GOOGLE SEARCH CONSOLE DOĞRULAMA (2. YÖNTEM) ---
+# Google botunun bu etiketi yakalaması için sayfanın en üstünde olmalıdır.
 components.html(
     """
-
-<meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
+    <html>
+        <head>
+            <meta name="google-site-verification" content="Th8SGOZ3kgDymghzF36ILYzEFOWfv9i3HQgRPnsx2KM" />
+        </head>
+        <body></body>
+    </html>
     """,
     height=0,
+)
+
+# Uygulama ayarların buradan devam etsin...
+st.set_page_config(
+    page_title="HaberAI - BIST Analiz",
+    page_icon="📈",
+    layout="wide"
 )
 # ============================================================
 # SAYFA AYARLARI
