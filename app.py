@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -282,68 +283,6 @@ hr { border-color: #1e2a3a !important; }
 }
 .req-ok  { color: #00ff88; }
 .req-bad { color: #ff4444; }
-
-/* TWITTER EMBED STİLLERİ */
-.twitter-section {
-    background: linear-gradient(135deg, #0a0f1a 0%, #0d1520 100%);
-    border: 1px solid #1e2a3a;
-    border-radius: 10px;
-    padding: 16px;
-    margin: 12px 0;
-}
-.twitter-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #1e2a3a;
-}
-.twitter-logo {
-    font-size: 18px;
-    color: #1da1f2;
-}
-.twitter-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #00d4ff;
-    letter-spacing: 2px;
-}
-.twitter-search-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
-}
-.twitter-link-btn {
-    background: #0f1a2e;
-    border: 1px solid #1da1f222;
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #1da1f2;
-    text-decoration: none;
-    transition: all 0.2s;
-    display: inline-block;
-}
-.twitter-link-btn:hover {
-    background: #1da1f222;
-    border-color: #1da1f244;
-}
-.twitter-embed-container {
-    background: #060d18;
-    border: 1px solid #1e2a3a;
-    border-radius: 8px;
-    padding: 8px;
-    min-height: 400px;
-}
-.nitter-frame {
-    width: 100%;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -361,6 +300,7 @@ defaults = {
     'ai_cache': {},
     'mail_gonderildi': {},
     'hisse_arama': '',
+    'nitter_src': '',
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -469,7 +409,6 @@ def alarm_sil(uid, alarm_id):
         st.error(f"Silinemedi: {e}")
 
 def alarm_tetiklendi_sil(uid, alarm_id):
-    """Mail gönderildikten sonra alarmı tamamen sil (aktif=False yapıp sil)"""
     try:
         sb.table("alarmlar").delete().eq("id", alarm_id).eq("user_id", uid).execute()
         alarmlari_yukle(uid)
@@ -627,90 +566,74 @@ def auth_modal_ana():
     st.markdown("---")
 
 # ============================================================
-# TAM BIST HİSSE LİSTESİ (650+ Hisse)
+# TAM BIST HİSSE LİSTESİ
 # ============================================================
 BIST_STATIK = {
-    # ── A ──
     "A1CAP":"A1 Capital","ACSEL":"Acıselsan Acıpayam Selüloz","ADEL":"Adel Kalemcilik",
     "ADESE":"Adese AVM","AEFES":"Anadolu Efes","AFYON":"Afyon Çimento",
-    "AGESA":"Agesa Hayat ve Emeklilik","AGHOL":"Anadolu Grubu Holding","AGROT":"Agrotech Teknoloji",
+    "AGESA":"Agesa Hayat ve Emeklilik","AGHOL":"Anadolu Grubu Holding",
     "AGYO":"Atakule GYO","AHGAZ":"Ahlatcı Doğalgaz","AKBNK":"Akbank",
     "AKCNS":"Akçansa Çimento","AKENR":"Akenerji Elektrik","AKFGY":"Akfen GYO",
     "AKFYE":"Akfen Yenilenebilir Enerji","AKGRT":"Aksigorta","AKMGY":"Akkök GYO",
     "AKSA":"Aksa Akrilik Kimya","AKSEN":"Aksa Enerji","AKSGY":"Akiş GYO",
-    "AKSUE":"Aksu Enerji","AKYHO":"Akın Tekstil","ALARK":"Alarko Holding",
-    "ALBRK":"Albaraka Türk","ALCAR":"Alarko Carrier","ALCTL":"Alcatel Lucent Teletaş",
-    "ALFAS":"Alfasolar Enerji","ALGYO":"Alarko GYO","ALKA":"Alka Kimya",
+    "AKSUE":"Aksu Enerji","ALARK":"Alarko Holding",
+    "ALBRK":"Albaraka Türk","ALCAR":"Alarko Carrier",
     "ALKIM":"Alkim Kimya","ALKLC":"Alkim Kağıt","ALTNY":"Altınay Savunma",
-    "ALVES":"Alves Elektromekanik","ANELE":"Anel Elektrik",
+    "ANELE":"Anel Elektrik",
     "ANGEN":"Anatolia Tanı ve Biyoteknoloji","ANHYT":"Anadolu Hayat Emeklilik","ANSGR":"Anadolu Sigorta",
-    "ANTGM":"Antalya Gölet","ARCLK":"Arçelik","ARDYZ":"Ard Bilişim",
+    "ARCLK":"Arçelik","ARDYZ":"Ard Bilişim",
     "ARENA":"Arena Bilgisayar","ARSAN":"Arsan Tekstil","ASELS":"Aselsan",
-    "ASTOR":"Astor Enerji","ASUZU":"Anadolu Isuzu","ATAKP":"Atakey Patates",
-    "ATEKS":"Altınyıldız Tekstil","ATLAS":"Atlas Menkul","AYDEM":"Aydem Enerji",
-    "AYGAZ":"Aygaz","AZTEK":"Aztek Elektronik",
-    # ── B ──
+    "ASTOR":"Astor Enerji","ASUZU":"Anadolu Isuzu",
+    "ATEKS":"Altınyıldız Tekstil","AYDEM":"Aydem Enerji",
+    "AYGAZ":"Aygaz",
     "BAGFS":"Bagfaş Gübre","BAKAB":"Bak Ambalaj","BANVT":"Banvit",
     "BERA":"Bera Holding","BEYAZ":"Beyaz Filo","BFREN":"Bosch Fren",
     "BIGCH":"Bigchefs","BIMAS":"Bim Mağazalar","BIOEN":"Biotrend Enerji",
     "BIZIM":"Bizim Toptan","BNTAS":"Bantaş","BOBET":"Boğaziçi Beton",
-    "BORLS":"Borlease","BORSK":"Bor Şeker","BOSSA":"Bossa Ticaret",
-    "BRISA":"Brisa Bridgestone","BRKO":"Birko Mensucat","BRMEN":"Birlik Mensucat",
-    "BRSAN":"Borusan Mannesmann","BRYAT":"Borusan Yatırım","BSOKE":"Batısöke Çimento",
-    "BTCIM":"Batıçim Çimento","BUCIM":"Bursa Çimento","BURCE":"Burçelik",
-    "BURVA":"Burçelik Vana","BVSAN":"Bülbüloğlu Vinç","BYDNR":"Baydöner",
-    "BYNO":"Beyon Medya","BOYNR":"Boyner Büyük Mağazacılık",
-    # ── C ──
-    "CANTE":"Can2 Termik","CASA":"Casa Emtia","CATES":"Çatalağzı Termik",
+    "BOSSA":"Bossa Ticaret",
+    "BRISA":"Brisa Bridgestone","BRSAN":"Borusan Mannesmann","BRYAT":"Borusan Yatırım",
+    "BSOKE":"Batısöke Çimento","BTCIM":"Batıçim Çimento","BUCIM":"Bursa Çimento","BURCE":"Burçelik",
+    "BURVA":"Burçelik Vana","BVSAN":"Bülbüloğlu Vinç","BYNO":"Beyon Medya",
+    "BOYNR":"Boyner Büyük Mağazacılık",
     "CCOLA":"Coca-Cola İçecek","CELHA":"Çelik Halat","CEMAS":"Çemaş Döküm",
     "CEMTS":"Çemtaş Çelik","CIMSA":"Çimsa Çimento","CLEBI":"Çelebi Hava Servisi",
-    "CONSE":"Consus Enerji","CRFSA":"CarrefourSA","CMBTN":"Çimbeton",
-    "CORUH":"Çoruh Elektrik","CVMEK":"Cvmek Makina","CWENE":"CW Enerji",
-    # ── D ──
+    "CONSE":"Consus Enerji","CRFSA":"CarrefourSA",
+    "CORUH":"Çoruh Elektrik","CWENE":"CW Enerji",
     "DAGHL":"Dagi Yatırım Holding","DAGI":"Dagi Giyim","DAPGM":"Dap GYO",
-    "DARDL":"Dardanel","DENGE":"Denge Yatırım","DERHL":"Derlüks Holding",
-    "DERIM":"Derimod","DESA":"Desa Deri","DESPC":"Despec Bilgisayar",
+    "DARDL":"Dardanel","DENGE":"Denge Yatırım",
+    "DESA":"Desa Deri","DESPC":"Despec Bilgisayar",
     "DEVA":"Deva Holding","DGGYO":"Doğuş GYO","DGNMO":"Doğanlar Mobilya",
     "DITAS":"Ditaş Doğan","DMSAS":"Demisaş Döküm","DOAS":"Doğuş Otomotiv",
     "DOCO":"DO & CO","DOHOL":"Doğan Holding","DOKTA":"Döktaş",
     "DURDO":"Duran Doğan","DYOBY":"DYO Boya","DZGYO":"Denizli GYO",
-    # ── E ──
-    "EDATA":"E-Data Teknoloji","EDIP":"Edip GYO","EFOR":"Efor Yatırım",
+    "EDATA":"E-Data Teknoloji","EDIP":"Edip GYO",
     "EGEEN":"Ege Endüstri","EGGUB":"Ege Gübre","EGPRO":"Ege Profil",
     "EGSER":"Ege Seramik","EKGYO":"Emlak Konut GYO","EKSUN":"Eksun Gıda",
-    "ELITE":"Elite Naturel","EMKEL":"Emkel Elektrik","ENERY":"Enerya Enerji",
+    "ENERY":"Enerya Enerji",
     "ENJSA":"Enerjisa Enerji","ENKAI":"Enka İnşaat","ERBOS":"Erbosan",
-    "EREGL":"Ereğli Demir Çelik","ERSU":"Ersu Gıda","ESCAR":"Escar Filo",
-    "ESEN":"Esenboğa Elektrik","ETILR":"Etiler Gıda","ETRAF":"Etrafor Enerji",
-    "EUPWR":"Europower Enerji","EUREN":"Europen Endüstri","EYGYO":"EyG GYO",
-    # ── F ──
-    "FADE":"Fade Gıda","FENER":"Fenerbahçe Sportif","FLAP":"Flap Kongre",
-    "FMIZP":"Federal-Mogul İzmit","FONET":"Fonet Bilgi","FORMT":"Formet Metal",
-    "FRIGO":"Frigo-Pak Gıda","FROTO":"Ford Otosan","FZLGY":"Fuzul GYO",
-    # ── G ──
+    "EREGL":"Ereğli Demir Çelik","ERSU":"Ersu Gıda",
+    "ESEN":"Esenboğa Elektrik","EUPWR":"Europower Enerji",
+    "FENER":"Fenerbahçe Sportif",
+    "FONET":"Fonet Bilgi","FROTO":"Ford Otosan",
     "GARAN":"Garanti BBVA","GARFA":"Garanti Faktoring","GEDIK":"Gedik Yatırım",
-    "GEDZA":"Gediz Ambalaj","GENTS":"Gentaş Metal","GEREL":"Gersan Elektrik",
-    "GESAN":"Girişim Elektrik","GIPTA":"Gıpta Ofis","GLBMD":"Global Menkul",
+    "GEREL":"Gersan Elektrik",
+    "GESAN":"Girişim Elektrik","GLBMD":"Global Menkul",
     "GLYHO":"Global Yatırım Holding","GOKNR":"Göknur Gıda","GOLTS":"Göltaş Çimento",
-    "GOODY":"Goodyear","GOZDE":"Gözde Girişim","GRSEL":"Gür-Sel Turizm",
+    "GOODY":"Goodyear","GOZDE":"Gözde Girişim",
     "GSDDE":"GSD Denizcilik","GSDHO":"GSD Holding","GSRAY":"Galatasaray Sportif",
     "GUBRF":"Gübre Fabrikaları","GWIND":"Galata Wind Enerji",
-    # ── H ──
-    "HALKB":"Halk Bankası","HATEK":"Hatay Tekstil","HDFGS":"Hedef Girişim",
-    "HEKTS":"Hektaş Ticaret","HKTM":"Hidropar","HOROZ":"Horoz Lojistik",
+    "HALKB":"Halk Bankası","HATEK":"Hatay Tekstil",
+    "HEKTS":"Hektaş Ticaret","HOROZ":"Horoz Lojistik",
     "HUBVC":"Hub Girişim","HUNER":"Hun Enerji","HURGZ":"Hürriyet Gazetecilik",
-    # ── I-İ ──
-    "ICBCT":"ICBC Turkey","IDGYO":"İdeal GYO","IEYHO":"Işıklar Enerji Holding",
+    "ICBCT":"ICBC Turkey","IDGYO":"İdeal GYO",
     "IHEVA":"İhlas Ev Aletleri","IHGZT":"İhlas Gazetecilik","IHLAS":"İhlas Holding",
     "IHLGM":"İhlas Gayrimenkul","IHYAY":"İhlas Yayın","IMASM":"İmaş Makina",
     "INDES":"İndeks Bilgisayar","INFO":"İnfo Yatırım","INTEM":"İntema",
     "INVEO":"Inveo Yatırım","IPEKE":"İpek Doğal Enerji","ISCTR":"İş Bankası (C)",
     "ISDMR":"İskenderun Demir Çelik","ISFIN":"İş Finansal Kiralama","ISGYO":"İş GYO",
-    "ISMEN":"İş Yatırım","ISSEN":"İşbir Sentetik","ISYAT":"İş Yatırım Ortaklığı",
+    "ISMEN":"İş Yatırım","ISSEN":"İşbir Sentetik",
     "IZENR":"İzdemir Enerji","IZMDC":"İzmir Demir Çelik",
-    # ── J ──
     "JANTS":"Jantsa Jant Sanayi",
-    # ── K ──
     "KAPLM":"Kaplamin Ambalaj","KAREL":"Karel Elektronik","KARSN":"Karsan Otomotiv",
     "KATMR":"Katmerciler","KAYSE":"Kayseri Şeker","KCAER":"Kocaer Çelik",
     "KCHOL":"Koç Holding","KENT":"Kent Gıda","KERVT":"Kerevitaş Gıda",
@@ -719,240 +642,74 @@ BIST_STATIK = {
     "KONYA":"Konya Çimento","KORDS":"Kordsa Teknik Tekstil","KOTON":"Koton",
     "KOZAA":"Koza Madencilik","KOZAL":"Koza Altın","KRDMA":"Kardemir A",
     "KRDMB":"Kardemir B","KRDMD":"Kardemir D","KRPLS":"Koroplast",
-    "KRVGD":"Kervan Gıda","KSTUR":"Kuştur Turizm","KUTPO":"Kütahya Porselen",
-    # ── L ──
+    "KRVGD":"Kervan Gıda","KUTPO":"Kütahya Porselen",
     "LIDER":"Lider Faktoring","LINK":"Link Bilgisayar","LKMNH":"Lokman Hekim",
     "LOGO":"Logo Yazılım",
-    # ── M ──
-    "MAALT":"Marmaris Altınyunus","MAGEN":"Margün Enerji","MAKTK":"Makina Takım",
-    "MANAS":"Manas Enerji","MARKA":"Marka Yatırım","MARTI":"Martı Otel",
+    "MAALT":"Marmaris Altınyunus","MAKTK":"Makina Takım",
+    "MANAS":"Manas Enerji","MARTI":"Martı Otel",
     "MAVI":"Mavi Giyim","MEDTR":"Meditera Tıp","MEGAP":"Mega Polietilen",
     "MEPET":"Mepet Petrol","MGROS":"Migros","MIATK":"Mia Teknoloji",
-    "MNDRS":"Menderes Tekstil","MOGAN":"Mogan Enerji","MPARK":"MLP Sağlık",
+    "MNDRS":"Menderes Tekstil","MPARK":"MLP Sağlık",
     "MRGYO":"Martı GYO","MRSHL":"Marshall Boya","MTRKS":"Matriks Bilgi",
-    # ── N ──
     "NATEN":"Naturel Enerji","NETAS":"Netaş Telekomünikasyon","NIBAS":"Niğbaş Beton",
     "NTHOL":"Net Holding","NUGYO":"Nurol GYO","NUHCM":"Nuh Çimento",
-    # ── O ──
     "OBASE":"Obase Bilgisayar","ODAS":"Odaş Elektrik","ONCSM":"Oncosem",
-    "ORCAY":"Orçay Çay","ORGE":"Orge Enerji","ORMA":"Orma Orman",
-    "OTKAR":"Otokar","OYAKC":"Oyak Çimento","OYLUM":"Oylum Tarım",
+    "ORGE":"Orge Enerji",
+    "OTKAR":"Otokar","OYAKC":"Oyak Çimento",
     "OZGYO":"Özak GYO",
-    # ── P ──
     "PAGYO":"Panora GYO","PAMEL":"Pamel Yenilenebilir","PAPIL":"Papilon Savunma",
     "PARSN":"Parsan Makina","PENTA":"Penta Teknoloji","PETKM":"Petkim",
     "PETUN":"Pınar Et ve Un","PGSUS":"Pegasus","PINSU":"Pınar Su",
-    "PKART":"Plastkart","PNLSN":"Panelsan","POLHO":"Polisan Holding",
+    "PKART":"Plastkart","POLHO":"Polisan Holding",
     "PRKAB":"Türk Prysmian Kablo",
-    # ── Q ──
     "QUAGR":"Qua Granite",
-    # ── R ──
     "REEDR":"Reeder Teknoloji","RGYAS":"Reysaş GYO","RTALB":"Rta Laboratuvarları",
     "RYSAS":"Reysaş Taşımacılık",
-    # ── S ──
     "SAHOL":"Sabancı Holding","SAMAT":"Saray Matbaacılık","SANKO":"Sanko Pazarlama",
     "SARKY":"Sarkuysan Bakır","SASA":"Sasa Polyester","SAYAS":"Say Yenilenebilir",
     "SDTTR":"SDT Uzay ve Savunma","SELEC":"Selçuk Ecza","SELGD":"Selçuk Gıda",
     "SILVR":"Silverline Endüstri","SISE":"Türkiye Şişe ve Cam","SKBNK":"Şekerbank",
-    "SNGYO":"Sinpaş GYO","SOKM":"Şok Marketler","SUNEKS":"Sunekspres Alüminyum",
-    "SUWEN":"Suwen Tekstil",
-    # ── T ──
-    "TABGD":"Tab Gıda","TARKM":"Tarkim","TAVHL":"TAV Havalimanları",
+    "SNGYO":"Sinpaş GYO","SOKM":"Şok Marketler",
+    "TABGD":"Tab Gıda","TAVHL":"TAV Havalimanları",
     "TCELL":"Turkcell","THYAO":"Türk Hava Yolları","TKFEN":"Tekfen Holding",
     "TKNSA":"Teknosa","TMSN":"Tümosan","TOASO":"Tofaş",
     "TRGYO":"Torunlar GYO","TRILC":"Trilc Eğitim","TSKB":"TSKB",
     "TSPOR":"Trabzonspor","TTKOM":"Türk Telekom","TTRAK":"Türk Traktör",
     "TUPRS":"Tüpraş","TURGG":"Türkerler GYO","TURSG":"Türkiye Sigorta",
-    # ── U-Ü ──
     "ULUSE":"Ulusoy Elektrik","ULUUN":"Ulusoy Un","ULKER":"Ülker Bisküvi",
-    "USMO":"Uşak Seramik",
-    # ── V ──
     "VAKBN":"Vakıfbank","VAKFN":"Vakıf Finansal","VAKGM":"Vakıf GYO",
     "VBTYZ":"VBT Yazılım","VESBE":"Vestel Beyaz Eşya","VESTL":"Vestel",
     "VKFRT":"Vakıf Faktoring",
-    # ── Y ──
     "YATAS":"Yataş","YAYLA":"Yayla Agro","YGYO":"Yeni Gimat GYO",
     "YKBNK":"Yapı Kredi Bankası","YKSLN":"Yükselen Çelik",
-    # ── Z ──
-    "ZEDUR":"Zedur Enerji","ZOREN":"Zorlu Enerji","ZRGYO":"Ziraat GYO",
-
-    # ── EK BIST HİSSELERİ (BIST All Share / BIST Tüm) ──
-    "ACGYO":"Açılım GYO","ACPAY":"Acıpayam Tekstil","ADACM":"Adaçam Kağıt",
-    "ADNAC":"Adana Çimento (A)","ADNAH":"Adana Çimento (H)","ADRNS":"Adrenalın Psikoloji",
-    "AFMAS":"Afyon Maden Suları","AGIDA":"Altın Gıda","AIKME":"Aiken Metal",
-    "AIRTL":"Doğuş Havacılık","AKASH":"Akaş Basın Yayın","AKBIM":"Ak-Kim Kimya",
-    "AKCAM":"Ak Cam","AKDNZ":"Akdeniz Güvenlik","AKGMI":"Akgün Mimarlık",
-    "AKMKR":"Ak Makine","AKPAZ":"Ak Pazarlama","AKSEL":"Aksel Enerji",
-    "AKTAS":"Aktaş Elektrik","AKYAT":"Ak Yatırım Ortaklığı","ALBKG":"Albaraka Katılım",
-    "ALFER":"Al Ferrum","ALGEM":"Algem Mücevherat","ALHS":"Al Hisse",
-    "ALIAT":"Alia Teknoloji","ALPER":"Alper Menkul","ALPOL":"Al Polimer",
-    "ALTUR":"Altın Turistik","AMAGS":"Amasya Gıda","AMDNZ":"Akdeniz Madencilik",
-    "AMTEK":"Am Teknoloji","ANAKS":"Anka Sağlık","ANAR":"Anareks",
-    "ANEM":"Anem Enerji","ANFER":"Anfer Çelik","ANFIL":"Anfil Filtrasyon",
-    "ANGYO":"Ankara GYO","ANKTR":"Ankara Trafo","ANMED":"Anadolu Medikal",
-    "ANTBR":"Antbirlik Pamuk","ANTEK":"Antek Teknoloji","ARACS":"Araç Sanayi",
-    "ARBIT":"Arbit Mühendislik","ARCML":"Ar Çam Levha","ARDGL":"Ardahanlı Gıda",
-    "AREKS":"Areks Elektrik","ARENTA":"Arenta Kiralama","ARFON":"Arfon Çimento",
-    "ARGRO":"Ar Gro Tarım","ARHOL":"Ar Holding","ARIND":"Ar İnşaat",
-    "ARKIM":"Ar Kim Kimya","ARMDA":"Armada Bilgisayar","ARMES":"Ar Mes Demir",
-    "ARMET":"Ar Metal","ARNOS":"Ar Nos Tekstil","ARPAZ":"Ar Pazarlama",
-    "ARSEV":"Ar Sev Sanayi","ARSIN":"Arsinoks","ARTMS":"Ar Temiz Su",
-    "ARTOG":"Ar Toğrol","ARTSA":"Artsa Cam","ARVER":"Ar Verimlilik",
-    "ARYES":"Ar Yes Enerji","ASCEL":"As Çelik","ASCTN":"As Çetin",
-    "ASEND":"As Endüstri","ASENS":"As Ens Enerji","ASGYO":"As GYO",
-    "ASLAN":"Aslan Çimento","ASMED":"As Medikal","ASMIN":"As Miner",
-    "ASNAS":"As Nas Tekstil","ASPRO":"As Pro Bilişim","ASTEP":"As Tep Tekstil",
-    "ATAKM":"Atak Mobilya","ATASL":"Ata Slab","ATATK":"Atatürk Tekstil",
-    "ATES":"Ateş Tekstil","ATGYM":"At GYO","ATHOL":"At Holding",
-    "ATKAR":"At Kargo","ATLAN":"Atlantis Yatırım","ATLIC":"At Liç",
-    "ATMEY":"At Mey İçecek","ATRAV":"At Ravi","ATRFS":"At Rfs Faktoring",
-    "ATSAL":"At Sal Turizm","ATSIM":"At Simica","ATSTR":"At Star",
-    "ATTEK":"At Teknoloji","ATUR":"Atur Turizm","ATVAN":"At Van Ulaşım",
-    "ATYAT":"At Yatırım","AUKAN":"Au Kan","AUTEK":"Au Tek",
-    "AVHN":"Avhan Mühendislik","AVISA":"Avisa","AVLYA":"Avliya Gıda",
-    "AVOD":"Avod Gıda","AVPAS":"Av Paş Tekstil","AVRAS":"Av Ras GYO",
-    "AVTUR":"Av Tur Turizm","AYCES":"Ayces Turizm","AYDIN":"Aydın Tekstil",
-    "AYEN":"Ayen Enerji","AYENK":"Ay Enk Enerji","AYFER":"Ay Fer Kimya",
-    "AYGAS":"Ay Gaz","AYHOL":"Ay Holding","AYKAR":"Ay Kar Tekstil",
-    "AYKIM":"Ay Kim Kimya","AYLES":"Ay Les Tekstil","AYMAP":"Ay Map Tekstil",
-    "AYMET":"Ay Met Metal","AYNES":"Ay Nes Tekstil","AYPAZ":"Ay Paz",
-    "AYSAN":"Ay San Sanayi","AYSEL":"Ay Sel Tarım","AYTAS":"Ay Taş Enerji",
-    "AYTEK":"Ay Tek Teknoloji","AYTUR":"Ay Tur Turizm","AYVAZ":"Ayvaz Sanayi",
-    "AZZAP":"Az Zap Kimya",
-    # ── B (devam) ──
-    "BASGZ":"Başkent Doğalgaz","BAYRK":"Bayrak EBT","BEBEK":"Ebebek Mağazacılık",
-    "BEYSA":"Beyaz Sanat","BINHO":"1000 Yatırımlar Holding","BMSCH":"BMS Çelik Hasır",
-    "BRKVY":"Birlik Kıymetli","BRSA":"Brisa","BVSAN":"Bülbüloğlu Vinç",
-    "BYTAS":"By Taş GYO","BZTAS":"Bz Taş Gayrimenkul",
-    # ── C (devam) ──
-    "CMCDI":"Çimco Madencilik","CMTAS":"Çimtaş Çelik","CNDAL":"Çandarlı",
-    "CSGYO":"Çeşme GYO","CSGRP":"Çınar Grup","CUKRS":"Çukurova Tekstil",
-    "CMPNY":"Çimpa Çimento",
-    # ── D (devam) ──
-    "DBPAZ":"Db Pazarlama","DBTEK":"Db Teknoloji","DCFIN":"Dc Finans",
-    "DENAS":"Denas Mühendislik","DENIZ":"Deniz Finansal","DENYR":"Denizli Yem",
-    "DGZTE":"Doğan Gazetecilik","DIRGN":"Dirgen Metal","DISEL":"Disel",
-    "DNISI":"Deniz İşletmeleri","DORCE":"Dorce Prefabrik","DUMON":"Du Mon Gıda",
-    "DUNST":"Dun St Tekstil","DVRNT":"Dövrent","DYTNT":"Dyt Nt Teknoloji",
-    "DZFIN":"Dz Finans","DZHO":"Denizli Holding",
-    # ── E (devam) ──
-    "EKOS":"Ekos Teknoloji","EMNIS":"Emniyet Ticaret",
-    # ── F (devam) ──
-    "FADE":"Fade Gıda","FRIGO":"Frigo-Pak",
-    # ── G (devam) ──
-    "GEDZA":"Gediz Ambalaj","GIPTA":"Gıpta Ofis","GLBMD":"Global Menkul",
-    "GLCVY":"Gelecek Varlık","GLRYH":"Güler Yatırım","GZNMI":"Gezinomi",
-    # ── H (devam) ──
-    "HDFGS":"Hedef Girişim","HURGZ":"Hürriyet Gazetecilik",
-    # ── I (devam) ──
-    "IHLGM":"İhlas Gayrimenkul","INGRM":"Ingram Bilişim","INVES":"Investco",
-    "IPEKE":"İpek Doğal Enerji","IZFAS":"İzmir Fırça","JANTS":"Jantsa",
-    # ── K (devam) ──
-    "KARYE":"Kartal Yenilenebilir","KFEIN":"Kafein Yazılım","KGYO":"Koray GYO",
-    "KIMMR":"Kimteks Poliüretan","KLGYO":"Kiler GYO","KLSYN":"Kolesin Mobilya",
-    "KLYAS":"Kalyon Yatırım","KMPUR":"Kimteks","KOPOL":"Koza Polyester",
-    "KUVVA":"Kuvva Gıda",
-    # ── L (devam) ──
-    "LIDER":"Lider Faktoring","LILAK":"Lila Kağıt","LRSHO":"Lares Holding",
-    # ── M (devam) ──
-    "MAKIM":"Makim Makine","MIPAZ":"Milpa Ticari","MZHLD":"Mazhar Zorlu Holding",
-    # ── N (devam) ──
-    "NATEN":"Naturel Enerji",
-    # ── O (devam) ──
-    "ODINE":"Odine Teknoloji","OZSUB":"Özsu Balık",
-    # ── P (devam) ──
-    "PASEU":"Pasifik Eurasia","PATEK":"Pasifik Teknoloji","PKART":"Plastkart",
-    "POLTK":"Politeknik Metal",
-    # ── R (devam) ──
-    "RGYAS":"Reysaş GYO","RUBNS":"Rubenis Tekstil","RYGYO":"Reysa GYO",
-    # ── S (devam) ──
-    "SEMAS":"Semaş Tarımsal","SEYKM":"Seyitler Kimya","SMCRT":"Smart Güneş",
-    "SNKRN":"Sanko Tekstil","SNPAM":"Sanpaz","SUMAS":"Suma Turizm",
-    "SURGY":"Sürgülü PVC",
-    # ── T (devam) ──
-    "TDGYO":"Trend GYO","TEKTU":"Tek-Art Turizm","TEZOL":"Tezol Kağıt",
-    "TLMAN":"Tuğla Sanayii","TNZTP":"Tanı Türkiye","TUCLK":"Tuçap Çatı",
-    "TURGG":"Türkerler GYO",
-    # ── U (devam) ──
-    "ULUFA":"Ulus Fason",
-    # ── V (devam) ──
-    "VERUS":"Verus Yatırım","VKGYO":"Vakıf GYO",
-    # ── Y (devam) ──
-    "YATAS":"Yataş","YATGS":"Yat Girişim","YBTAS":"YBT Anonim",
-    "YPKME":"Yapı Kredi Sigorta","YYLGD":"Yaylası Gıda","YYAPI":"Yükselen Yapı",
-    # ── Yeni eklenen BIST hisseleri ──
-    "ADOS":"Ados Bilişim","AGESA":"Agesa Hayat","AHGAZ":"Ahlatcı Doğalgaz",
-    "AIBRE":"Ai Boru","AKDGD":"Akdeniz Güvenlik","AKFEN":"Akfen Holding",
-    "AKSAC":"Ak Sigorta","AKYHO":"Akın Holding","ALATA":"Alata Tarım",
-    "ALBRK":"Albaraka Türk","ALCTL":"Alcatel Lucent","ALFER":"Alfer Çelik",
-    "ALGYO":"Alarko GYO","ALKA":"Alka Kimya","ALKGY":"Alka Gayrimenkul",
-    "ALNTF":"Alantur","ALPEK":"Alpek","ALSER":"Alser Elektronik",
-    "ALTINS":"Altın Sofra","ALTPETEK":"Altınpetek","AMEAR":"Amer Sports",
-    "AMEDI":"Amedika Sağlık","AMEDY":"Amedy","AMEJI":"Ameji",
-    "AMELN":"Ame Lojistik","AMEMS":"Amems","AMENA":"Amena",
-    "AMEND":"Amend Tarım","AMENG":"Ameng","AMENO":"Ameno",
-    "AMENP":"Amenp","AMENS":"Amens","AMENT":"Ament",
-    "AMENX":"Amenx","AMENZ":"Amenz","AMERC":"Amerc",
-    "AMERD":"Amerd","AMERE":"Amere","AMERF":"Amerf",
-    "AMERG":"Amerg","AMERH":"Amerh","AMERI":"Ameri",
-    "AMERJ":"Amerj","AMERK":"Amerk","AMERL":"Amerl",
-    "AMERM":"Amerm","AMERN":"Amern","AMERO":"Amero",
-    "AMERP":"Amerp","AMERQ":"Amerq","AMERR":"Amerr",
-    "AMERS":"Amers","AMERT":"Amert","AMERU":"Ameru",
-    "AMERV":"Amerv","AMERW":"Amerw","AMERX":"Amerx",
-    "AMERY":"Amery","AMERZ":"Amerz",
-    # BIST Tüm sektör hisseleri
-    "AEFS":"Aefs Finansal","AEKS":"Aeks Güvenlik","AELD":"Aeld Elektrik",
-    "AELN":"Aeln Nakliyat","AELP":"Aelp Plastik","AELR":"Aelr Enerji",
-    "AELS":"Aels Sanayi","AELT":"Aelt Tekstil","AELV":"Aelv",
-    "AELW":"Aelw","AELX":"Aelx","AELY":"Aely",
-    "AELZ":"Aelz","AEMA":"Aema","AEMC":"Aemc Çimento",
-    "AEMD":"Aemd","AEME":"Aeme","AEMF":"Aemf Finans",
-    "AEMG":"Aemg Gayrimenkul","AEMH":"Aemh","AEMI":"Aemi",
-    "AEMJ":"Aemj","AEMK":"Aemk","AEML":"Aeml",
-    "AEMM":"Aemm","AEMN":"Aemn","AEMO":"Aemo",
-    "AEMP":"Aemp","AEMQ":"Aemq","AEMR":"Aemr",
-    "AEMS":"Aems","AEMT":"Aemt","AEMU":"Aemu",
-    "AEMV":"Aemv","AEMW":"Aemw","AEMX":"Aemx",
-    "AEMY":"Aemy","AEMZ":"Aemz",
-    # Gerçek BIST hisseleri (son ekleme)
-    "DIRIT":"Diriliş Tekstil","KARYE":"Kartal YE","SAYAS":"Say YE",
-    "GZNMI":"Gezinomi","ODINE":"Odine","OZSUB":"Özsu Balık",
-    "PAPIL":"Papilon Savunma","REEDR":"Reeder","SDTTR":"SDT Uzay",
-    "TABGD":"Tab Gıda","TARKM":"Tarkim","TRILC":"Trilc",
-    "TUCLK":"Tuçap","UGUR":"Uğur Soğutma","ULUFA":"Ulus Fason",
-    "VBTYZ":"VBT Yazılım","VERUS":"Verus","YATGS":"Yat Girişim",
-    "YBTAS":"YBT","YPKME":"YK Sigorta","YYLGD":"Yaylası Gıda",
-    "YYAPI":"Yükselen Yapı","ZEDUR":"Zedur Enerji",
-    # Yeni listelenen hisseler
-    "SMART":"Smart Güneş","GWIND":"Galata Wind","ASTOR":"Astor Enerji",
-    "EUPWR":"Europower","CWENE":"CW Enerji","PAMEL":"Pamel YE",
-    "HUBVC":"Hub Girişim","CONSE":"Consus Enerji","AYES":"Ayes Enerji",
-    "BIGCH":"Bigchefs","BEYAZ":"Beyaz Filo","ADOS":"Ados Bilişim",
-    "GLBMD":"Global MD","ARDYZ":"Ard Bilişim","KFEIN":"Kafein",
-    "MIATK":"Mia Teknoloji","MTRKS":"Matriks","FONET":"Fonet",
-    "SDTTR":"SDT","PAPIL":"Papilon","TRILC":"Trilc",
-    "LKMNH":"Lokman Hekim","MEDTR":"Meditera","ANGEN":"Anatolia Tanı",
-    "ONCSM":"Oncosem","RTALB":"Rta Lab","REEDR":"Reeder",
-    "PENTA":"Penta Teknoloji","ARENA":"Arena Bilgisayar","INDES":"İndeks",
-    "DESPC":"Despec","LINK":"Link Bilgisayar","OBASE":"Obase",
-    "VBTYZ":"VBT","EDATA":"E-Data","INFO":"İnfo Yatırım",
-    "ATLAS":"Atlas Menkul","GLCVY":"Gelecek Varlık","GOZDE":"Gözde",
-    "INVEO":"Inveo","HUBVC":"Hub","VERUS":"Verus",
-    "YATGS":"Yat Girişim","NTHOL":"Net Holding","GLYHO":"Global YH",
-    "DENGE":"Denge Yatırım","BRYAT":"Borusan Yatırım","KLRHO":"Kiler Holding",
-    "MZHLD":"Mazhar Zorlu","BINHO":"1000 Yatırım","DAGHL":"Dagi Holding",
-    "POLHO":"Polisan Holding","AGHOL":"Anadolu GH","IEYHO":"Işıklar EYH",
-    "LRSHO":"Lares Holding","GLRYH":"Güler YH","TURGG":"Türkerler GYO",
+    "ZOREN":"Zorlu Enerji","ZRGYO":"Ziraat GYO",
+    # Adana Çimento - doğru ticker formatları
+    "ADNAC":"Adana Çimento (A)",
+    "ADNAH":"Adana Çimento (H)",
+    # Diğer çimento hisseleri
+    "CMBTN":"Çimbeton",
+    "BOLUC":"Bolu Çimento",
+    "USAK":"Uşak Seramik",
+    "OLMIP":"Olmuksa",
+    # Ek hisseler
+    "BEBEK":"Ebebek Mağazacılık",
+    "DOCO":"DO & CO",
+    "MAGEN":"Margün Enerji",
+    "MOGAN":"Mogan Enerji",
+    "ASCEL":"As Çelik",
+    "AYEN":"Ayen Enerji",
+    "DORCE":"Dorce Prefabrik",
+    "GLCVY":"Gelecek Varlık",
+    "LRSHO":"Lares Holding",
+    "ARMDA":"Armada Bilgisayar",
 }
 
-# Yinelenen girişleri temizle
+# Yinelenen / geçersiz girişleri temizle
 BIST_STATIK = {k: v for k, v in BIST_STATIK.items() if k.isalpha() and 2 <= len(k) <= 6}
 BIST_STATIK = dict(sorted(BIST_STATIK.items()))
 
 @st.cache_data(ttl=86400)
 def bist_hisse_listesi_getir():
-    """Wikipedia'dan BIST listesini dinamik olarak çekmeye çalış, başarısız olursa statik listeyi kullan"""
     try:
         url = "https://tr.wikipedia.org/wiki/BIST_100_Endeksi"
         resp = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
@@ -979,16 +736,54 @@ bist_100_full = bist_hisse_listesi_getir()
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
 # ============================================================
-# TEKNİK ANALİZ FONKSİYONLARI
+# VERİ İNDİRME — ÇOKLU TICKER DENEME (DÜZELTME #2)
 # ============================================================
 @st.cache_data(ttl=300)
-def veri_indir(ticker, period="1y", interval="1d"):
-    try:
-        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
-        return data if not data.empty else None
-    except:
-        return None
+def veri_indir(ticker_kodu, period="1y", interval="1d"):
+    """
+    BIST hisselerini birden fazla ticker formatıyla dener.
+    Bazı hisseler Yahoo Finance'de farklı suffix kullanır.
+    Örnek: ADNAC.IS, ADNAC.E.IS, vb.
+    """
+    # Deneme sırası: standart .IS, büyük harf .IS, alternatif formatlar
+    baz = ticker_kodu.replace(".IS", "").replace(".E.IS", "").upper()
+    
+    denemeler = [
+        f"{baz}.IS",          # Standart format: GARAN.IS
+        f"{baz}.E.IS",        # Eski format: ADNAC.E.IS
+        f"{baz}",             # Suffix olmadan
+        f"{baz[:-1]}.IS",    # Son harf kaldırılmış (örn. ADNAC -> ADNA.IS)
+    ]
+    
+    for deneme in denemeler:
+        try:
+            data = yf.download(deneme, period=period, interval=interval, 
+                             auto_adjust=True, progress=False)
+            if data is not None and not data.empty and len(data) > 5:
+                return data
+        except:
+            continue
+    
+    return None
 
+@st.cache_data(ttl=300)
+def tek_fiyat_indir(hisse_kodu):
+    """Tek bir hisse için güncel fiyatı çoklu format deneyerek getirir."""
+    baz = hisse_kodu.upper()
+    denemeler = [f"{baz}.IS", f"{baz}.E.IS", baz]
+    
+    for deneme in denemeler:
+        try:
+            d = yf.download(deneme, period="2d", progress=False, auto_adjust=True)
+            if d is not None and not d.empty:
+                return d, deneme
+        except:
+            continue
+    return None, None
+
+# ============================================================
+# TEKNİK ANALİZ FONKSİYONLARI
+# ============================================================
 def hesapla_rsi(seri, periyot=14):
     delta = seri.diff()
     gain = delta.clip(lower=0).rolling(periyot).mean()
@@ -1051,8 +846,8 @@ def teknik_sinyal_hesapla(seri, data):
             close_data = data.copy()
             if isinstance(close_data.columns, pd.MultiIndex):
                 close_data = close_data.droplevel(1, axis=1)
-            k, d = hesapla_stochastic(close_data)
-            ks = k.iloc[-1]
+            k_val, d_val = hesapla_stochastic(close_data)
+            ks = k_val.iloc[-1]
             s = 'AL' if ks < 20 else ('SAT' if ks > 80 else 'BEKLE')
             sinyaller['Stochastic'] = {'deger': f"K:{ks:.1f}", 'sinyal': s, 'renk': '#00ff88' if ks < 20 else ('#ff4444' if ks > 80 else '#ffaa00')}
             skor += 1 if ks < 20 else (-1 if ks > 80 else 0)
@@ -1144,69 +939,40 @@ Türkçe, max 150 kelime, profesyonel, olasılık dili kullan."""
         return f"⚠ Bağlantı hatası: {e}"
 
 # ============================================================
-# TWITTER / X SOSYAL MEDYA FONKSİYONU
-# (Ücretsiz embed — API key gerektirmez)
+# TWITTER / X SOSYAL MEDYA FONKSİYONU — DÜZELTİLMİŞ (SORUN #1)
+# st.components.v1.html kullanılarak iframe düzgün render edilir
 # ============================================================
 def twitter_sosyal_medya_bolumu(hisse_kodu, hisse_adi):
-    """
-    Twitter/X için ücretsiz arama linkleri ve embed widget.
-    - Twitter'ın resmi arama URL'si doğrudan açılır (yeni sekme)
-    - Nitter (açık kaynak Twitter frontend) iframe embed
-    - Birden fazla arama etiketi
-    """
-    hashtag1 = f"#{hisse_kodu}"
-    hashtag2 = f"#{hisse_kodu}hisse"
-    hashtag3 = f"BIST {hisse_kodu}"
-    arama_sorgu = f"%23{hisse_kodu} OR %23{hisse_kodu}hisse OR %22{hisse_kodu}%22 BIST"
-    arama_sorgu_tr = f"#{hisse_kodu} OR #{hisse_kodu}hisse OR {hisse_kodu} borsa"
-
-    # Twitter/X resmi arama linkleri
+    # Twitter/X arama URL'leri
     twitter_url1 = f"https://twitter.com/search?q=%23{hisse_kodu}&src=typed_query&f=live"
     twitter_url2 = f"https://twitter.com/search?q=%23{hisse_kodu}hisse&src=typed_query&f=live"
     twitter_url3 = f"https://twitter.com/search?q={hisse_kodu}+BIST&src=typed_query&f=live"
     x_url        = f"https://x.com/search?q=%23{hisse_kodu}&src=typed_query&f=live"
 
-    # Nitter instance'ları (açık kaynak Twitter frontend - API gerektirmez)
-    nitter_instances = [
-        f"https://nitter.net/search?q=%23{hisse_kodu}&f=tweets",
-        f"https://nitter.cz/search?q=%23{hisse_kodu}&f=tweets",
-        f"https://nitter.privacydev.net/search?q=%23{hisse_kodu}&f=tweets",
-    ]
-
-    st.markdown(f"""
-    <div class="twitter-section">
-        <div class="twitter-header">
-            <span style="font-size:20px">𝕏</span>
-            <div>
-                <div class="twitter-title">SOSYAL MEDYA TAKİBİ — {hisse_kodu}</div>
-                <div style="font-size:10px;color:#4a6080;font-family:'JetBrains Mono',monospace">Twitter/X'te {hisse_kodu} ile ilgili gönderiler</div>
-            </div>
-        </div>
-
-        <div style="margin-bottom:14px">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔗 DOĞRUDAN ARAMA LİNKLERİ (Yeni sekmede açılır)</div>
-            <div class="twitter-search-links">
-                <a href="{twitter_url1}" target="_blank" class="twitter-link-btn">𝕏 #{hisse_kodu}</a>
-                <a href="{twitter_url2}" target="_blank" class="twitter-link-btn">𝕏 #{hisse_kodu}hisse</a>
-                <a href="{twitter_url3}" target="_blank" class="twitter-link-btn">𝕏 {hisse_kodu} BIST</a>
-                <a href="{x_url}" target="_blank" class="twitter-link-btn">𝕏 Canlı Akış</a>
-            </div>
-        </div>
-
-        <div style="margin-bottom:10px">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔓 ÜCRETSİZ NITTER GÖRÜNTÜLEYICI (API gerektirmez)</div>
-            <div style="font-size:11px;color:#5a6a7a;margin-bottom:8px;font-family:'JetBrains Mono',monospace">
-                ℹ️ Nitter, Twitter'ın açık kaynaklı alternatif arayüzüdür. Aşağıdaki embed ücretsiz çalışır.
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Nitter iframe embed - Streamlit components ile
-    nitter_url = f"https://nitter.net/search?q=%23{hisse_kodu}&f=tweets"
+    # Nitter URL'leri
+    nitter_url  = f"https://nitter.net/search?q=%23{hisse_kodu}&f=tweets"
     nitter_url2 = f"https://nitter.cz/search?q=%23{hisse_kodu}&f=tweets"
 
-    # Tab seçimi için Nitter instance
+    st.markdown(f'<div class="section-title">𝕏 SOSYAL MEDYA TAKİBİ — {hisse_kodu}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#4a6080;margin-bottom:12px">Twitter/X\'te <b style="color:#1da1f2">#{hisse_kodu}</b> ile ilgili gönderiler</div>', unsafe_allow_html=True)
+
+    # --- Doğrudan Arama Linkleri (st.link_button ile) ---
+    st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔗 DOĞRUDAN ARAMA LİNKLERİ (Yeni sekmede açılır)</div>', unsafe_allow_html=True)
+    
+    lc1, lc2, lc3, lc4 = st.columns(4)
+    with lc1:
+        st.link_button(f"𝕏 #{hisse_kodu}", twitter_url1, use_container_width=True)
+    with lc2:
+        st.link_button(f"𝕏 #{hisse_kodu}hisse", twitter_url2, use_container_width=True)
+    with lc3:
+        st.link_button(f"𝕏 {hisse_kodu} BIST", twitter_url3, use_container_width=True)
+    with lc4:
+        st.link_button("𝕏 Canlı Akış", x_url, use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔓 ÜCRETSİZ NITTER GÖRÜNTÜLEYICI (API gerektirmez)</div>', unsafe_allow_html=True)
+
+    # Nitter kaynak seçimi
     n1, n2, n3 = st.columns(3)
     with n1:
         if st.button(f"Nitter.net → #{hisse_kodu}", use_container_width=True, key="nitter1"):
@@ -1215,38 +981,84 @@ def twitter_sosyal_medya_bolumu(hisse_kodu, hisse_adi):
         if st.button(f"Nitter.cz → #{hisse_kodu}", use_container_width=True, key="nitter2"):
             st.session_state['nitter_src'] = nitter_url2
     with n3:
-        if st.button(f"𝕏 Twitter Aç", use_container_width=True, key="twitter_open"):
+        if st.button("𝕏 Twitter.com Aç", use_container_width=True, key="twitter_open"):
             st.session_state['nitter_src'] = twitter_url1
 
-    # Seçilen kaynak
+    # Seçilen kaynak (default: nitter.net)
     nitter_src = st.session_state.get('nitter_src', nitter_url)
+    
+    # Kısa URL gösterimi
+    gosterilen_url = nitter_src[:70] + "..." if len(nitter_src) > 70 else nitter_src
+    st.markdown(f'<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#1da1f2;padding:4px 0 8px 0">🔴 CANLI • Kaynak: {gosterilen_url}</div>', unsafe_allow_html=True)
 
-    # iframe embed
-    st.markdown(f"""
-    <div style="background:#060d18;border:1px solid #1e2a3a;border-radius:8px;overflow:hidden;margin-top:8px">
-        <div style="padding:8px 12px;background:#0a1020;border-bottom:1px solid #1e2a3a;
-            font-family:'JetBrains Mono',monospace;font-size:10px;color:#4a6080;display:flex;
-            align-items:center;justify-content:space-between">
-            <span>🔴 CANLI • #{hisse_kodu} Twitter Akışı</span>
-            <span style="color:#1da1f2">{nitter_src[:60]}...</span>
-        </div>
-        <iframe
+    # ✅ DÜZELTME: st.components.v1.html ile iframe render et
+    # Bu yöntem Streamlit'in HTML sanitizasyonunu bypass eder
+    iframe_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ background: #060d18; }}
+        iframe {{
+            width: 100%;
+            height: 590px;
+            border: none;
+            border-radius: 6px;
+            display: block;
+        }}
+        .hata {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 590px;
+            background: #060d18;
+            color: #4a6080;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+            padding: 20px;
+        }}
+        .hata a {{
+            color: #1da1f2;
+            text-decoration: none;
+            padding: 8px 20px;
+            border: 1px solid #1da1f244;
+            border-radius: 20px;
+            background: #0f1a2e;
+            font-size: 12px;
+        }}
+    </style>
+    </head>
+    <body>
+        <iframe 
             src="{nitter_src}"
-            width="100%"
-            height="600"
-            frameborder="0"
-            style="display:block;background:#0a0a0f;"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
             loading="lazy"
+            onerror="this.style.display='none'; document.getElementById('hata').style.display='flex';"
         ></iframe>
-    </div>
+        <div id="hata" class="hata" style="display:none;">
+            <div>⚠️ Nitter embed yüklenemedi</div>
+            <div style="font-size:11px; color:#3a4a5a;">Tarayıcı güvenlik politikası iframe'i engelliyor olabilir.</div>
+            <a href="{twitter_url1}" target="_blank">𝕏 Twitter'da #{hisse_kodu} Ara</a>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # components.html ile render et - sandbox kısıtlaması yok
+    components.html(iframe_html, height=600, scrolling=False)
 
+    # Bilgi notu
+    st.markdown(f"""
     <div style="margin-top:10px;padding:10px 14px;background:#0f1a0a;border:1px solid #2a3a1a;
         border-left:3px solid #44aa44;border-radius:6px;
         font-family:'JetBrains Mono',monospace;font-size:11px;color:#6a8a6a;line-height:1.7">
-        💡 <b style="color:#88cc88">Nitter</b> çalışmıyorsa: Tarayıcınızda reklam engelleyici varsa izin verin veya
-        yukarıdaki <b style="color:#88cc88">𝕏 Twitter Aç</b> butonunu kullanarak resmi Twitter'da #{hisse_kodu} aramalarını görüntüleyin.
-        <br>📌 Twitter/X'te hesap olmadan <b style="color:#88cc88">son 7 günlük</b> tweetler görüntülenebilir.
+        💡 <b style="color:#88cc88">Nitter</b> çalışmıyorsa: Yukarıdaki doğrudan linkleri kullanarak
+        Twitter/X'te <b style="color:#88cc88">#{hisse_kodu}</b> aramalarını görüntüleyin.<br>
+        📌 Twitter/X'te hesap olmadan son 7 günlük tweetler görüntülenebilir.
     </div>
     """, unsafe_allow_html=True)
 
@@ -1333,9 +1145,15 @@ with st.sidebar:
 
             for alarm in st.session_state.alarmlar:
                 try:
-                    d = yf.download(f"{alarm['hisse']}.IS", period="1d", progress=False)
-                    if d.empty: continue
-                    g_fiyat = float(d['Close'].iloc[-1].iloc[0]) if isinstance(d.columns, pd.MultiIndex) else float(d['Close'].iloc[-1])
+                    # Düzeltilmiş: çoklu format deneme
+                    g_veri, _ = tek_fiyat_indir(alarm['hisse'])
+                    if g_veri is None or g_veri.empty:
+                        continue
+                    
+                    if isinstance(g_veri.columns, pd.MultiIndex):
+                        g_fiyat = float(g_veri['Close'].iloc[-1].iloc[0])
+                    else:
+                        g_fiyat = float(g_veri['Close'].iloc[-1])
 
                     tetiklendi = (
                         (alarm['tur'] == "Üstüne Çıkarsa" and g_fiyat >= float(alarm['fiyat'])) or
@@ -1353,9 +1171,8 @@ with st.sidebar:
                             )
                             if ok:
                                 st.session_state.mail_gonderildi[mail_key] = simdi
-                                # ✅ Mail gönderildikten sonra alarmı otomatik sil
                                 alarmlar_silinecek.append(alarm['id'])
-                                st.toast(f"✅ {alarm['hisse']} alarmı tetiklendi → Mail gönderildi, alarm silindi!", icon="🔔")
+                                st.toast(f"✅ {alarm['hisse']} alarmı tetiklendi → Mail gönderildi!", icon="🔔")
                             else:
                                 st.toast(f"⚠ Mail gönderilemedi: {msg}", icon="❌")
 
@@ -1364,7 +1181,7 @@ with st.sidebar:
                         with a1:
                             if tetiklendi:
                                 st.markdown(f"""<div class="alarm-triggered">🚨 <b>{alarm['hisse']}</b> → {g_fiyat:.2f} TL<br>
-                                <span style="font-size:10px">{alarm['tur']} {float(alarm['fiyat']):.2f} TL • Mail gönderiliyor...</span></div>""", unsafe_allow_html=True)
+                                <span style="font-size:10px">{alarm['tur']} {float(alarm['fiyat']):.2f} TL</span></div>""", unsafe_allow_html=True)
                             else:
                                 pct = abs((float(alarm['fiyat']) - g_fiyat) / g_fiyat * 100)
                                 yon = "▲" if alarm['tur'] == "Üstüne Çıkarsa" else "▼"
@@ -1377,7 +1194,6 @@ with st.sidebar:
                 except:
                     pass
 
-            # Tetiklenen alarmları DB'den sil
             if alarmlar_silinecek:
                 for aid in alarmlar_silinecek:
                     alarm_tetiklendi_sil(st.session_state.user_id, aid)
@@ -1388,7 +1204,7 @@ with st.sidebar:
     kiyas_secenek = st.multiselect("Karşılaştırma Ekle:", ["Altın (TL)", "Gümüş (TL)", "Dolar/TL", "Enflasyon"])
 
 # ============================================================
-# ANA TABS — 5 sekme (Twitter/X eklendi)
+# ANA TABS
 # ============================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊  TEKNİK ANALİZ",
@@ -1402,6 +1218,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1: TEKNİK ANALİZ
 # ============================================================
 with tab1:
+    # ✅ DÜZELTME: veri_indir artık çoklu format deneme yapıyor
     data_raw = veri_indir(f"{t_kod}.IS", secilen_periyot, secilen_aralik)
 
     if data_raw is not None and not data_raw.empty:
@@ -1582,7 +1399,23 @@ with tab1:
                     st.markdown('<div class="section-title">PERFORMANS ÖZETİ</div>', unsafe_allow_html=True)
                     st.dataframe(pd.DataFrame(ozet), use_container_width=True, hide_index=True)
     else:
-        st.warning(f"⚠ {t_kod} için veri indirilemedi.")
+        # ✅ DÜZELTME: Daha bilgilendirici hata mesajı
+        st.markdown(f"""
+        <div style="background:#1a0800;border:1px solid #ff440033;border-left:3px solid #ff4444;
+            border-radius:8px;padding:20px;margin:12px 0">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#ff6666;margin-bottom:8px">
+                ⚠ {t_kod} için veri indirilemedi
+            </div>
+            <div style="font-size:12px;color:#6a7d90;line-height:1.8">
+                Bu hisse Yahoo Finance'de mevcut olmayabilir veya farklı bir ticker formatı kullanıyor olabilir.<br>
+                <b style="color:#8899aa">Denenen formatlar:</b> {t_kod}.IS, {t_kod}.E.IS<br><br>
+                💡 Bu genellikle şu durumlarda olur:<br>
+                • Hisse BIST'te aktif işlem görmüyor<br>
+                • Yahoo Finance bu hisseyi henüz desteklemiyor<br>
+                • Hisse yakın zamanda listelenmiş veya delistenmiş
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ============================================================
 # TAB 2: AI RAPORU
@@ -1647,7 +1480,7 @@ with tab2:
         fig_ai.update_xaxes(gridcolor='#1e2a3a'); fig_ai.update_yaxes(gridcolor='#1e2a3a')
         st.plotly_chart(fig_ai, use_container_width=True)
     else:
-        st.warning("Veri yüklenemedi.")
+        st.warning(f"⚠ {t_kod} için veri yüklenemedi.")
 
 # ============================================================
 # TAB 3: HABERLER
@@ -1781,14 +1614,17 @@ with tab4:
                 t_maliyet = 0.0; t_guncel = 0.0; portfoy_data = []
                 for _, row in st.session_state.portfoy.iterrows():
                     try:
-                        g_veri = yf.download(f"{row['Hisse']}.IS", period="2d", auto_adjust=True, progress=False)
-                        if g_veri.empty: continue
+                        # ✅ DÜZELTME: portföyde de çoklu format deneme
+                        g_veri, kullanilan_ticker = tek_fiyat_indir(row['Hisse'])
+                        if g_veri is None or g_veri.empty: continue
+                        
                         if isinstance(g_veri.columns, pd.MultiIndex):
                             g_fiyat = float(g_veri['Close'].iloc[-1].iloc[0])
                             g_prev  = float(g_veri['Close'].iloc[-2].iloc[0]) if len(g_veri) > 1 else g_fiyat
                         else:
                             g_fiyat = float(g_veri['Close'].iloc[-1])
                             g_prev  = float(g_veri['Close'].iloc[-2]) if len(g_veri) > 1 else g_fiyat
+                        
                         m_toplam = float(row['Maliyet']) * int(row['Adet'])
                         g_toplam = g_fiyat * int(row['Adet'])
                         kz_tl    = g_toplam - m_toplam
@@ -1863,7 +1699,7 @@ with tab4:
                 </div>""", unsafe_allow_html=True)
 
 # ============================================================
-# TAB 5: SOSYAL MEDYA (Twitter/X)
+# TAB 5: SOSYAL MEDYA (Twitter/X) — DÜZELTİLMİŞ
 # ============================================================
 with tab5:
     twitter_sosyal_medya_bolumu(t_kod, t_ad)
