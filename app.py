@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -52,15 +51,6 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stSidebar"] {
     background-color: #0f0f1a !important;
     border-right: 1px solid #1e2a3a !important;
-}
-.terminal-header {
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
-    border-bottom: 1px solid #00d4ff33;
-    padding: 16px 24px;
-    margin: -20px -20px 20px -20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
 }
 .terminal-logo {
     font-family: 'JetBrains Mono', monospace;
@@ -197,7 +187,6 @@ hr { border-color: #1e2a3a !important; }
     color: #7aa8cc;
     line-height: 1.6;
 }
-.info-box-icon { font-size: 14px; margin-right: 6px; }
 .success-box {
     background: linear-gradient(135deg, #0a1e0f 0%, #0f2818 100%);
     border: 1px solid #00ff8822;
@@ -220,6 +209,21 @@ hr { border-color: #1e2a3a !important; }
     color: #ccaa44;
     line-height: 1.6;
 }
+.data-source-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.src-yahoo  { background: #6001d222; color: #9040ff; border: 1px solid #6001d244; }
+.src-stooq  { background: #00880022; color: #00cc66; border: 1px solid #00880044; }
+.src-invest { background: #0044ff22; color: #4488ff; border: 1px solid #0044ff44; }
+.src-manual { background: #ff880022; color: #ffaa44; border: 1px solid #ff880044; }
 .steps-box {
     background: #0f1520;
     border: 1px solid #1e2a3a;
@@ -300,7 +304,6 @@ defaults = {
     'ai_cache': {},
     'mail_gonderildi': {},
     'hisse_arama': '',
-    'nitter_src': '',
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -448,7 +451,7 @@ def auth_modal_ana():
     with center_col:
         if mod == 'giris':
             st.markdown('<div class="auth-box-title">🔐 GİRİŞ YAP</div>', unsafe_allow_html=True)
-            st.markdown('<div class="info-box"><span class="info-box-icon">ℹ️</span>Kayıtlı e-posta adresiniz ve şifrenizle giriş yapın.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="info-box"><span>ℹ️</span> Kayıtlı e-posta adresiniz ve şifrenizle giriş yapın.</div>', unsafe_allow_html=True)
             email = st.text_input("E-posta:", key="g_email", placeholder="siz@email.com")
             sifre = st.text_input("Şifre:", type="password", key="g_sifre")
             c1, c2 = st.columns(2)
@@ -546,7 +549,7 @@ def auth_modal_ana():
 
         elif mod == 'sifre':
             st.markdown('<div class="auth-box-title">🔑 ŞİFRE SIFIRLA</div>', unsafe_allow_html=True)
-            st.markdown('<div class="info-box"><span class="info-box-icon">ℹ️</span>Kayıtlı e-postanıza sıfırlama bağlantısı göndereceğiz.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="info-box"><span>ℹ️</span> Kayıtlı e-postanıza sıfırlama bağlantısı göndereceğiz.</div>', unsafe_allow_html=True)
             email = st.text_input("Kayıtlı E-posta:", key="s_email", placeholder="siz@email.com")
             c1, c2 = st.columns(2)
             with c1:
@@ -579,45 +582,39 @@ BIST_STATIK = {
     "AKSUE":"Aksu Enerji","ALARK":"Alarko Holding",
     "ALBRK":"Albaraka Türk","ALCAR":"Alarko Carrier",
     "ALKIM":"Alkim Kimya","ALKLC":"Alkim Kağıt","ALTNY":"Altınay Savunma",
-    "ANELE":"Anel Elektrik",
-    "ANGEN":"Anatolia Tanı ve Biyoteknoloji","ANHYT":"Anadolu Hayat Emeklilik","ANSGR":"Anadolu Sigorta",
+    "ANELE":"Anel Elektrik","ANGEN":"Anatolia Tanı ve Biyoteknoloji",
+    "ANHYT":"Anadolu Hayat Emeklilik","ANSGR":"Anadolu Sigorta",
     "ARCLK":"Arçelik","ARDYZ":"Ard Bilişim",
     "ARENA":"Arena Bilgisayar","ARSAN":"Arsan Tekstil","ASELS":"Aselsan",
     "ASTOR":"Astor Enerji","ASUZU":"Anadolu Isuzu",
-    "ATEKS":"Altınyıldız Tekstil","AYDEM":"Aydem Enerji",
-    "AYGAZ":"Aygaz",
+    "ATEKS":"Altınyıldız Tekstil","AYDEM":"Aydem Enerji","AYGAZ":"Aygaz",
     "BAGFS":"Bagfaş Gübre","BAKAB":"Bak Ambalaj","BANVT":"Banvit",
     "BERA":"Bera Holding","BEYAZ":"Beyaz Filo","BFREN":"Bosch Fren",
     "BIGCH":"Bigchefs","BIMAS":"Bim Mağazalar","BIOEN":"Biotrend Enerji",
     "BIZIM":"Bizim Toptan","BNTAS":"Bantaş","BOBET":"Boğaziçi Beton",
-    "BOSSA":"Bossa Ticaret",
+    "BOSSA":"Bossa Ticaret","BOYNR":"Boyner Büyük Mağazacılık",
     "BRISA":"Brisa Bridgestone","BRSAN":"Borusan Mannesmann","BRYAT":"Borusan Yatırım",
     "BSOKE":"Batısöke Çimento","BTCIM":"Batıçim Çimento","BUCIM":"Bursa Çimento","BURCE":"Burçelik",
     "BURVA":"Burçelik Vana","BVSAN":"Bülbüloğlu Vinç","BYNO":"Beyon Medya",
-    "BOYNR":"Boyner Büyük Mağazacılık",
     "CCOLA":"Coca-Cola İçecek","CELHA":"Çelik Halat","CEMAS":"Çemaş Döküm",
     "CEMTS":"Çemtaş Çelik","CIMSA":"Çimsa Çimento","CLEBI":"Çelebi Hava Servisi",
-    "CONSE":"Consus Enerji","CRFSA":"CarrefourSA",
-    "CORUH":"Çoruh Elektrik","CWENE":"CW Enerji",
-    "DAGHL":"Dagi Yatırım Holding","DAGI":"Dagi Giyim","DAPGM":"Dap GYO",
-    "DARDL":"Dardanel","DENGE":"Denge Yatırım",
+    "CONSE":"Consus Enerji","CRFSA":"CarrefourSA","CORUH":"Çoruh Elektrik",
+    "CWENE":"CW Enerji","DAGHL":"Dagi Yatırım Holding","DAGI":"Dagi Giyim",
+    "DAPGM":"Dap GYO","DARDL":"Dardanel","DENGE":"Denge Yatırım",
     "DESA":"Desa Deri","DESPC":"Despec Bilgisayar",
     "DEVA":"Deva Holding","DGGYO":"Doğuş GYO","DGNMO":"Doğanlar Mobilya",
     "DITAS":"Ditaş Doğan","DMSAS":"Demisaş Döküm","DOAS":"Doğuş Otomotiv",
-    "DOCO":"DO & CO","DOHOL":"Doğan Holding","DOKTA":"Döktaş",
+    "DOHOL":"Doğan Holding","DOKTA":"Döktaş","DORCE":"Dorce Prefabrik",
     "DURDO":"Duran Doğan","DYOBY":"DYO Boya","DZGYO":"Denizli GYO",
     "EDATA":"E-Data Teknoloji","EDIP":"Edip GYO",
     "EGEEN":"Ege Endüstri","EGGUB":"Ege Gübre","EGPRO":"Ege Profil",
     "EGSER":"Ege Seramik","EKGYO":"Emlak Konut GYO","EKSUN":"Eksun Gıda",
-    "ENERY":"Enerya Enerji",
-    "ENJSA":"Enerjisa Enerji","ENKAI":"Enka İnşaat","ERBOS":"Erbosan",
-    "EREGL":"Ereğli Demir Çelik","ERSU":"Ersu Gıda",
+    "ENERY":"Enerya Enerji","ENJSA":"Enerjisa Enerji","ENKAI":"Enka İnşaat",
+    "ERBOS":"Erbosan","EREGL":"Ereğli Demir Çelik","ERSU":"Ersu Gıda",
     "ESEN":"Esenboğa Elektrik","EUPWR":"Europower Enerji",
-    "FENER":"Fenerbahçe Sportif",
-    "FONET":"Fonet Bilgi","FROTO":"Ford Otosan",
+    "FENER":"Fenerbahçe Sportif","FONET":"Fonet Bilgi","FROTO":"Ford Otosan",
     "GARAN":"Garanti BBVA","GARFA":"Garanti Faktoring","GEDIK":"Gedik Yatırım",
-    "GEREL":"Gersan Elektrik",
-    "GESAN":"Girişim Elektrik","GLBMD":"Global Menkul",
+    "GEREL":"Gersan Elektrik","GESAN":"Girişim Elektrik","GLBMD":"Global Menkul",
     "GLYHO":"Global Yatırım Holding","GOKNR":"Göknur Gıda","GOLTS":"Göltaş Çimento",
     "GOODY":"Goodyear","GOZDE":"Gözde Girişim",
     "GSDDE":"GSD Denizcilik","GSDHO":"GSD Holding","GSRAY":"Galatasaray Sportif",
@@ -633,78 +630,53 @@ BIST_STATIK = {
     "ISDMR":"İskenderun Demir Çelik","ISFIN":"İş Finansal Kiralama","ISGYO":"İş GYO",
     "ISMEN":"İş Yatırım","ISSEN":"İşbir Sentetik",
     "IZENR":"İzdemir Enerji","IZMDC":"İzmir Demir Çelik",
-    "JANTS":"Jantsa Jant Sanayi",
-    "KAPLM":"Kaplamin Ambalaj","KAREL":"Karel Elektronik","KARSN":"Karsan Otomotiv",
-    "KATMR":"Katmerciler","KAYSE":"Kayseri Şeker","KCAER":"Kocaer Çelik",
-    "KCHOL":"Koç Holding","KENT":"Kent Gıda","KERVT":"Kerevitaş Gıda",
-    "KFEIN":"Kafein Yazılım","KLKIM":"Kalekim","KLMSN":"Klimasan",
-    "KLRHO":"Kiler Holding","KNFRT":"Konfrut Gıda","KONTR":"Kontrolmatik",
-    "KONYA":"Konya Çimento","KORDS":"Kordsa Teknik Tekstil","KOTON":"Koton",
-    "KOZAA":"Koza Madencilik","KOZAL":"Koza Altın","KRDMA":"Kardemir A",
-    "KRDMB":"Kardemir B","KRDMD":"Kardemir D","KRPLS":"Koroplast",
-    "KRVGD":"Kervan Gıda","KUTPO":"Kütahya Porselen",
+    "JANTS":"Jantsa Jant Sanayi","KAPLM":"Kaplamin Ambalaj","KAREL":"Karel Elektronik",
+    "KARSN":"Karsan Otomotiv","KATMR":"Katmerciler","KAYSE":"Kayseri Şeker",
+    "KCAER":"Kocaer Çelik","KCHOL":"Koç Holding","KENT":"Kent Gıda",
+    "KERVT":"Kerevitaş Gıda","KFEIN":"Kafein Yazılım","KLKIM":"Kalekim",
+    "KLMSN":"Klimasan","KLRHO":"Kiler Holding","KNFRT":"Konfrut Gıda",
+    "KONTR":"Kontrolmatik","KONYA":"Konya Çimento","KORDS":"Kordsa Teknik Tekstil",
+    "KOTON":"Koton","KOZAA":"Koza Madencilik","KOZAL":"Koza Altın",
+    "KRDMA":"Kardemir A","KRDMB":"Kardemir B","KRDMD":"Kardemir D",
+    "KRPLS":"Koroplast","KRVGD":"Kervan Gıda","KUTPO":"Kütahya Porselen",
     "LIDER":"Lider Faktoring","LINK":"Link Bilgisayar","LKMNH":"Lokman Hekim",
-    "LOGO":"Logo Yazılım",
-    "MAALT":"Marmaris Altınyunus","MAKTK":"Makina Takım",
-    "MANAS":"Manas Enerji","MARTI":"Martı Otel",
-    "MAVI":"Mavi Giyim","MEDTR":"Meditera Tıp","MEGAP":"Mega Polietilen",
-    "MEPET":"Mepet Petrol","MGROS":"Migros","MIATK":"Mia Teknoloji",
-    "MNDRS":"Menderes Tekstil","MPARK":"MLP Sağlık",
-    "MRGYO":"Martı GYO","MRSHL":"Marshall Boya","MTRKS":"Matriks Bilgi",
-    "NATEN":"Naturel Enerji","NETAS":"Netaş Telekomünikasyon","NIBAS":"Niğbaş Beton",
-    "NTHOL":"Net Holding","NUGYO":"Nurol GYO","NUHCM":"Nuh Çimento",
-    "OBASE":"Obase Bilgisayar","ODAS":"Odaş Elektrik","ONCSM":"Oncosem",
-    "ORGE":"Orge Enerji",
-    "OTKAR":"Otokar","OYAKC":"Oyak Çimento",
-    "OZGYO":"Özak GYO",
+    "LOGO":"Logo Yazılım","MAALT":"Marmaris Altınyunus","MAKTK":"Makina Takım",
+    "MANAS":"Manas Enerji","MARTI":"Martı Otel","MAVI":"Mavi Giyim",
+    "MEDTR":"Meditera Tıp","MEGAP":"Mega Polietilen","MEPET":"Mepet Petrol",
+    "MGROS":"Migros","MIATK":"Mia Teknoloji","MNDRS":"Menderes Tekstil",
+    "MPARK":"MLP Sağlık","MRGYO":"Martı GYO","MRSHL":"Marshall Boya",
+    "MTRKS":"Matriks Bilgi","NATEN":"Naturel Enerji","NETAS":"Netaş Telekomünikasyon",
+    "NIBAS":"Niğbaş Beton","NTHOL":"Net Holding","NUGYO":"Nurol GYO","NUHCM":"Nuh Çimento",
+    "OBASE":"Obase Bilgisayar","ODAS":"Odaş Elektrik","ONCSM":"Oncosem","ORGE":"Orge Enerji",
+    "OTKAR":"Otokar","OYAKC":"Oyak Çimento","OZGYO":"Özak GYO",
     "PAGYO":"Panora GYO","PAMEL":"Pamel Yenilenebilir","PAPIL":"Papilon Savunma",
     "PARSN":"Parsan Makina","PENTA":"Penta Teknoloji","PETKM":"Petkim",
     "PETUN":"Pınar Et ve Un","PGSUS":"Pegasus","PINSU":"Pınar Su",
-    "PKART":"Plastkart","POLHO":"Polisan Holding",
-    "PRKAB":"Türk Prysmian Kablo",
-    "QUAGR":"Qua Granite",
-    "REEDR":"Reeder Teknoloji","RGYAS":"Reysaş GYO","RTALB":"Rta Laboratuvarları",
-    "RYSAS":"Reysaş Taşımacılık",
+    "PKART":"Plastkart","POLHO":"Polisan Holding","PRKAB":"Türk Prysmian Kablo",
+    "QUAGR":"Qua Granite","REEDR":"Reeder Teknoloji","RGYAS":"Reysaş GYO",
+    "RTALB":"Rta Laboratuvarları","RYSAS":"Reysaş Taşımacılık",
     "SAHOL":"Sabancı Holding","SAMAT":"Saray Matbaacılık","SANKO":"Sanko Pazarlama",
     "SARKY":"Sarkuysan Bakır","SASA":"Sasa Polyester","SAYAS":"Say Yenilenebilir",
     "SDTTR":"SDT Uzay ve Savunma","SELEC":"Selçuk Ecza","SELGD":"Selçuk Gıda",
     "SILVR":"Silverline Endüstri","SISE":"Türkiye Şişe ve Cam","SKBNK":"Şekerbank",
-    "SNGYO":"Sinpaş GYO","SOKM":"Şok Marketler",
-    "TABGD":"Tab Gıda","TAVHL":"TAV Havalimanları",
-    "TCELL":"Turkcell","THYAO":"Türk Hava Yolları","TKFEN":"Tekfen Holding",
-    "TKNSA":"Teknosa","TMSN":"Tümosan","TOASO":"Tofaş",
+    "SNGYO":"Sinpaş GYO","SOKM":"Şok Marketler","TABGD":"Tab Gıda",
+    "TAVHL":"TAV Havalimanları","TCELL":"Turkcell","THYAO":"Türk Hava Yolları",
+    "TKFEN":"Tekfen Holding","TKNSA":"Teknosa","TMSN":"Tümosan","TOASO":"Tofaş",
     "TRGYO":"Torunlar GYO","TRILC":"Trilc Eğitim","TSKB":"TSKB",
     "TSPOR":"Trabzonspor","TTKOM":"Türk Telekom","TTRAK":"Türk Traktör",
     "TUPRS":"Tüpraş","TURGG":"Türkerler GYO","TURSG":"Türkiye Sigorta",
     "ULUSE":"Ulusoy Elektrik","ULUUN":"Ulusoy Un","ULKER":"Ülker Bisküvi",
     "VAKBN":"Vakıfbank","VAKFN":"Vakıf Finansal","VAKGM":"Vakıf GYO",
     "VBTYZ":"VBT Yazılım","VESBE":"Vestel Beyaz Eşya","VESTL":"Vestel",
-    "VKFRT":"Vakıf Faktoring",
-    "YATAS":"Yataş","YAYLA":"Yayla Agro","YGYO":"Yeni Gimat GYO",
-    "YKBNK":"Yapı Kredi Bankası","YKSLN":"Yükselen Çelik",
+    "VKFRT":"Vakıf Faktoring","YATAS":"Yataş","YAYLA":"Yayla Agro",
+    "YGYO":"Yeni Gimat GYO","YKBNK":"Yapı Kredi Bankası","YKSLN":"Yükselen Çelik",
     "ZOREN":"Zorlu Enerji","ZRGYO":"Ziraat GYO",
-    # Adana Çimento - doğru ticker formatları
-    "ADNAC":"Adana Çimento (A)",
-    "ADNAH":"Adana Çimento (H)",
-    # Diğer çimento hisseleri
-    "CMBTN":"Çimbeton",
-    "BOLUC":"Bolu Çimento",
-    "USAK":"Uşak Seramik",
-    "OLMIP":"Olmuksa",
-    # Ek hisseler
-    "BEBEK":"Ebebek Mağazacılık",
-    "DOCO":"DO & CO",
-    "MAGEN":"Margün Enerji",
-    "MOGAN":"Mogan Enerji",
-    "ASCEL":"As Çelik",
-    "AYEN":"Ayen Enerji",
-    "DORCE":"Dorce Prefabrik",
-    "GLCVY":"Gelecek Varlık",
-    "LRSHO":"Lares Holding",
-    "ARMDA":"Armada Bilgisayar",
+    "ADNAC":"Adana Çimento (A)","ADNAH":"Adana Çimento (H)",
+    "CMBTN":"Çimbeton","BOLUC":"Bolu Çimento","USAK":"Uşak Seramik",
+    "OLMIP":"Olmuksa","BEBEK":"Ebebek Mağazacılık","MAGEN":"Margün Enerji",
+    "MOGAN":"Mogan Enerji","ASCEL":"As Çelik","AYEN":"Ayen Enerji",
+    "GLCVY":"Gelecek Varlık","LRSHO":"Lares Holding","ARMDA":"Armada Bilgisayar",
 }
-
-# Yinelenen / geçersiz girişleri temizle
 BIST_STATIK = {k: v for k, v in BIST_STATIK.items() if k.isalpha() and 2 <= len(k) <= 6}
 BIST_STATIK = dict(sorted(BIST_STATIK.items()))
 
@@ -736,50 +708,126 @@ bist_100_full = bist_hisse_listesi_getir()
 hisse_listesi = [f"{kod} - {ad}" for kod, ad in bist_100_full.items()]
 
 # ============================================================
-# VERİ İNDİRME — ÇOKLU TICKER DENEME (DÜZELTME #2)
+# ÇOKLU KAYNAK VERİ İNDİRME — YAHOO + STOOQ + INVESTING RSS
 # ============================================================
+
+# --- 1. Yahoo Finance (yfinance) ---
+def _yahoo_indir(baz, period, interval):
+    """Yahoo Finance'den BIST hissesi indir - çoklu ticker formatı dener."""
+    denemeler = [
+        f"{baz}.IS",
+        f"{baz}.E.IS",
+    ]
+    for ticker in denemeler:
+        try:
+            data = yf.download(ticker, period=period, interval=interval,
+                               auto_adjust=True, progress=False)
+            if data is not None and not data.empty and len(data) > 5:
+                return data, "yahoo", ticker
+        except:
+            continue
+    return None, None, None
+
+# --- 2. Stooq (ücretsiz, API key gerekmez) ---
+def _stooq_indir(baz, period_days=365):
+    """
+    Stooq.com'dan BIST verisi indir.
+    URL örneği: https://stooq.com/q/d/l/?s=garan.tr&i=d
+    BIST hisseleri Stooq'ta .tr suffix'i ile yer alır.
+    """
+    try:
+        symbol = f"{baz.lower()}.tr"
+        url = f"https://stooq.com/q/d/l/?s={symbol}&i=d"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        resp = requests.get(url, headers=headers, timeout=12)
+        if resp.status_code != 200:
+            return None, None
+        from io import StringIO
+        df = pd.read_csv(StringIO(resp.text))
+        if df.empty or "Date" not in df.columns:
+            return None, None
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.set_index("Date").sort_index()
+        # Sadece son period_days günü al
+        cutoff = datetime.now() - timedelta(days=period_days)
+        df = df[df.index >= cutoff]
+        # Sütunları yfinance formatına uyarla
+        col_map = {"Open": "Open", "High": "High", "Low": "Low",
+                   "Close": "Close", "Volume": "Volume"}
+        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+        required = ["Open", "High", "Low", "Close"]
+        if all(c in df.columns for c in required) and len(df) > 5:
+            return df, "stooq"
+    except Exception as e:
+        pass
+    return None, None
+
+# --- 3. Investing.com RSS tabanlı son fiyat (sadece güncel fiyat için) ---
+def _investing_son_fiyat(baz):
+    """
+    Investing.com Türkiye RSS beslemesinden belirli hisse son fiyatını dener.
+    Bu yalnızca veri yoksa fallback olarak kullanılır.
+    """
+    try:
+        url = "https://tr.investing.com/rss/news_301.rss"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers, timeout=8)
+        # RSS'den fiyat çekilemez, bu kaynak sadece haber için uygun.
+    except:
+        pass
+    return None
+
+# --- Ana veri indirme fonksiyonu ---
 @st.cache_data(ttl=300)
 def veri_indir(ticker_kodu, period="1y", interval="1d"):
     """
-    BIST hisselerini birden fazla ticker formatıyla dener.
-    Bazı hisseler Yahoo Finance'de farklı suffix kullanır.
-    Örnek: ADNAC.IS, ADNAC.E.IS, vb.
+    BIST hissesi verisi indir.
+    Öncelik: Yahoo Finance → Stooq
+    Hangi kaynaktan geldiğini de döndürür.
     """
-    # Deneme sırası: standart .IS, büyük harf .IS, alternatif formatlar
     baz = ticker_kodu.replace(".IS", "").replace(".E.IS", "").upper()
-    
-    denemeler = [
-        f"{baz}.IS",          # Standart format: GARAN.IS
-        f"{baz}.E.IS",        # Eski format: ADNAC.E.IS
-        f"{baz}",             # Suffix olmadan
-        f"{baz[:-1]}.IS",    # Son harf kaldırılmış (örn. ADNAC -> ADNA.IS)
-    ]
-    
-    for deneme in denemeler:
-        try:
-            data = yf.download(deneme, period=period, interval=interval, 
-                             auto_adjust=True, progress=False)
-            if data is not None and not data.empty and len(data) > 5:
-                return data
-        except:
-            continue
-    
-    return None
+
+    # Periyodu gün sayısına çevir (Stooq için)
+    period_days_map = {"1mo": 35, "3mo": 100, "1y": 370, "3y": 1100, "5y": 1850}
+    period_days = period_days_map.get(period, 370)
+
+    # --- Deneme 1: Yahoo Finance ---
+    data, kaynak, kullanilan = _yahoo_indir(baz, period, interval)
+    if data is not None:
+        return data, "yahoo", kullanilan
+
+    # --- Deneme 2: Stooq ---
+    # Stooq sadece günlük veri sunar; interval ne olursa olsun günlük kullan
+    data, kaynak = _stooq_indir(baz, period_days)
+    if data is not None:
+        return data, "stooq", f"{baz.lower()}.tr"
+
+    return None, None, None
 
 @st.cache_data(ttl=300)
 def tek_fiyat_indir(hisse_kodu):
-    """Tek bir hisse için güncel fiyatı çoklu format deneyerek getirir."""
+    """Tek bir hisse için güncel fiyatı çoklu kaynak ile getirir."""
     baz = hisse_kodu.upper()
-    denemeler = [f"{baz}.IS", f"{baz}.E.IS", baz]
-    
-    for deneme in denemeler:
-        try:
-            d = yf.download(deneme, period="2d", progress=False, auto_adjust=True)
-            if d is not None and not d.empty:
-                return d, deneme
-        except:
-            continue
-    return None, None
+
+    # Yahoo Finance
+    data_yf, kaynak_yf, ticker_yf = _yahoo_indir(baz, "5d", "1d")
+    if data_yf is not None and not data_yf.empty:
+        return data_yf, ticker_yf, "yahoo"
+
+    # Stooq
+    data_st, kaynak_st = _stooq_indir(baz, 10)
+    if data_st is not None and not data_st.empty:
+        return data_st, f"{baz.lower()}.tr", "stooq"
+
+    return None, None, None
+
+def kaynak_rozeti(kaynak):
+    """Veri kaynağını gösteren HTML rozeti döndürür."""
+    if kaynak == "yahoo":
+        return '<span class="data-source-badge src-yahoo">YAHOO</span>'
+    elif kaynak == "stooq":
+        return '<span class="data-source-badge src-stooq">STOOQ</span>'
+    return '<span class="data-source-badge src-manual">BİLİNMİYOR</span>'
 
 # ============================================================
 # TEKNİK ANALİZ FONKSİYONLARI
@@ -939,130 +987,6 @@ Türkçe, max 150 kelime, profesyonel, olasılık dili kullan."""
         return f"⚠ Bağlantı hatası: {e}"
 
 # ============================================================
-# TWITTER / X SOSYAL MEDYA FONKSİYONU — DÜZELTİLMİŞ (SORUN #1)
-# st.components.v1.html kullanılarak iframe düzgün render edilir
-# ============================================================
-def twitter_sosyal_medya_bolumu(hisse_kodu, hisse_adi):
-    # Twitter/X arama URL'leri
-    twitter_url1 = f"https://twitter.com/search?q=%23{hisse_kodu}&src=typed_query&f=live"
-    twitter_url2 = f"https://twitter.com/search?q=%23{hisse_kodu}hisse&src=typed_query&f=live"
-    twitter_url3 = f"https://twitter.com/search?q={hisse_kodu}+BIST&src=typed_query&f=live"
-    x_url        = f"https://x.com/search?q=%23{hisse_kodu}&src=typed_query&f=live"
-
-    # Nitter URL'leri
-    nitter_url  = f"https://nitter.net/search?q=%23{hisse_kodu}&f=tweets"
-    nitter_url2 = f"https://nitter.cz/search?q=%23{hisse_kodu}&f=tweets"
-
-    st.markdown(f'<div class="section-title">𝕏 SOSYAL MEDYA TAKİBİ — {hisse_kodu}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#4a6080;margin-bottom:12px">Twitter/X\'te <b style="color:#1da1f2">#{hisse_kodu}</b> ile ilgili gönderiler</div>', unsafe_allow_html=True)
-
-    # --- Doğrudan Arama Linkleri (st.link_button ile) ---
-    st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔗 DOĞRUDAN ARAMA LİNKLERİ (Yeni sekmede açılır)</div>', unsafe_allow_html=True)
-    
-    lc1, lc2, lc3, lc4 = st.columns(4)
-    with lc1:
-        st.link_button(f"𝕏 #{hisse_kodu}", twitter_url1, use_container_width=True)
-    with lc2:
-        st.link_button(f"𝕏 #{hisse_kodu}hisse", twitter_url2, use_container_width=True)
-    with lc3:
-        st.link_button(f"𝕏 {hisse_kodu} BIST", twitter_url3, use_container_width=True)
-    with lc4:
-        st.link_button("𝕏 Canlı Akış", x_url, use_container_width=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#4a6080;letter-spacing:1px;margin-bottom:8px">🔓 ÜCRETSİZ NITTER GÖRÜNTÜLEYICI (API gerektirmez)</div>', unsafe_allow_html=True)
-
-    # Nitter kaynak seçimi
-    n1, n2, n3 = st.columns(3)
-    with n1:
-        if st.button(f"Nitter.net → #{hisse_kodu}", use_container_width=True, key="nitter1"):
-            st.session_state['nitter_src'] = nitter_url
-    with n2:
-        if st.button(f"Nitter.cz → #{hisse_kodu}", use_container_width=True, key="nitter2"):
-            st.session_state['nitter_src'] = nitter_url2
-    with n3:
-        if st.button("𝕏 Twitter.com Aç", use_container_width=True, key="twitter_open"):
-            st.session_state['nitter_src'] = twitter_url1
-
-    # Seçilen kaynak (default: nitter.net)
-    nitter_src = st.session_state.get('nitter_src', nitter_url)
-    
-    # Kısa URL gösterimi
-    gosterilen_url = nitter_src[:70] + "..." if len(nitter_src) > 70 else nitter_src
-    st.markdown(f'<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:#1da1f2;padding:4px 0 8px 0">🔴 CANLI • Kaynak: {gosterilen_url}</div>', unsafe_allow_html=True)
-
-    # ✅ DÜZELTME: st.components.v1.html ile iframe render et
-    # Bu yöntem Streamlit'in HTML sanitizasyonunu bypass eder
-    iframe_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ background: #060d18; }}
-        iframe {{
-            width: 100%;
-            height: 590px;
-            border: none;
-            border-radius: 6px;
-            display: block;
-        }}
-        .hata {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 590px;
-            background: #060d18;
-            color: #4a6080;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            flex-direction: column;
-            gap: 12px;
-            text-align: center;
-            padding: 20px;
-        }}
-        .hata a {{
-            color: #1da1f2;
-            text-decoration: none;
-            padding: 8px 20px;
-            border: 1px solid #1da1f244;
-            border-radius: 20px;
-            background: #0f1a2e;
-            font-size: 12px;
-        }}
-    </style>
-    </head>
-    <body>
-        <iframe 
-            src="{nitter_src}"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
-            loading="lazy"
-            onerror="this.style.display='none'; document.getElementById('hata').style.display='flex';"
-        ></iframe>
-        <div id="hata" class="hata" style="display:none;">
-            <div>⚠️ Nitter embed yüklenemedi</div>
-            <div style="font-size:11px; color:#3a4a5a;">Tarayıcı güvenlik politikası iframe'i engelliyor olabilir.</div>
-            <a href="{twitter_url1}" target="_blank">𝕏 Twitter'da #{hisse_kodu} Ara</a>
-        </div>
-    </body>
-    </html>
-    """
-    
-    # components.html ile render et - sandbox kısıtlaması yok
-    components.html(iframe_html, height=600, scrolling=False)
-
-    # Bilgi notu
-    st.markdown(f"""
-    <div style="margin-top:10px;padding:10px 14px;background:#0f1a0a;border:1px solid #2a3a1a;
-        border-left:3px solid #44aa44;border-radius:6px;
-        font-family:'JetBrains Mono',monospace;font-size:11px;color:#6a8a6a;line-height:1.7">
-        💡 <b style="color:#88cc88">Nitter</b> çalışmıyorsa: Yukarıdaki doğrudan linkleri kullanarak
-        Twitter/X'te <b style="color:#88cc88">#{hisse_kodu}</b> aramalarını görüntüleyin.<br>
-        📌 Twitter/X'te hesap olmadan son 7 günlük tweetler görüntülenebilir.
-    </div>
-    """, unsafe_allow_html=True)
-
-# ============================================================
 # HEADER
 # ============================================================
 h_left, h_right = st.columns([3, 1])
@@ -1145,11 +1069,10 @@ with st.sidebar:
 
             for alarm in st.session_state.alarmlar:
                 try:
-                    # Düzeltilmiş: çoklu format deneme
-                    g_veri, _ = tek_fiyat_indir(alarm['hisse'])
+                    g_veri, _, _ = tek_fiyat_indir(alarm['hisse'])
                     if g_veri is None or g_veri.empty:
                         continue
-                    
+
                     if isinstance(g_veri.columns, pd.MultiIndex):
                         g_fiyat = float(g_veri['Close'].iloc[-1].iloc[0])
                     else:
@@ -1204,22 +1127,20 @@ with st.sidebar:
     kiyas_secenek = st.multiselect("Karşılaştırma Ekle:", ["Altın (TL)", "Gümüş (TL)", "Dolar/TL", "Enflasyon"])
 
 # ============================================================
-# ANA TABS
+# ANA TABS — Sosyal Medya sekmesi kaldırıldı
 # ============================================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📊  TEKNİK ANALİZ",
     "🤖  AI RAPORU",
     "📰  HABERLER",
     "💼  PORTFÖY",
-    "𝕏  SOSYAL MEDYA",
 ])
 
 # ============================================================
 # TAB 1: TEKNİK ANALİZ
 # ============================================================
 with tab1:
-    # ✅ DÜZELTME: veri_indir artık çoklu format deneme yapıyor
-    data_raw = veri_indir(f"{t_kod}.IS", secilen_periyot, secilen_aralik)
+    data_raw, veri_kaynagi, kullanilan_ticker = veri_indir(f"{t_kod}.IS", secilen_periyot, secilen_aralik)
 
     if data_raw is not None and not data_raw.empty:
         if isinstance(data_raw.columns, pd.MultiIndex):
@@ -1234,12 +1155,22 @@ with tab1:
         degisim_yuzde = ((fiyat_son - fiyat_prev) / fiyat_prev) * 100
 
         try:
-            hacim = data_raw['Volume'].iloc[:, 0].mean() if isinstance(data_raw.columns, pd.MultiIndex) else data_raw['Volume'].mean()
+            hacim_col = data_raw['Volume']
+            hacim = float(hacim_col.iloc[:, 0].mean()) if isinstance(hacim_col, pd.DataFrame) else float(hacim_col.mean())
         except:
             hacim = 0
 
         sinyaller, skor, genel_sinyal = teknik_sinyal_hesapla(seri, data_raw)
         rsi_val = hesapla_rsi(seri).iloc[-1] if len(seri) > 14 else 50.0
+
+        # Veri kaynağı göstergesi
+        rozet_html = kaynak_rozeti(veri_kaynagi)
+        st.markdown(
+            f'<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#4a6080;margin-bottom:8px">'
+            f'Veri kaynağı: {rozet_html} &nbsp;•&nbsp; Ticker: <b style="color:#8899aa">{kullanilan_ticker}</b>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
 
         mc1, mc2, mc3, mc4, mc5 = st.columns(5)
         with mc1:
@@ -1255,7 +1186,10 @@ with tab1:
             sinyal_cls = "metric-positive" if "AL" in genel_sinyal else ("metric-negative" if "SAT" in genel_sinyal else "metric-neutral")
             st.markdown(f'<div class="metric-card"><div class="metric-label">TEKNİK SİNYAL</div><div class="metric-value {sinyal_cls}" style="font-size:16px">{genel_sinyal}</div></div>', unsafe_allow_html=True)
         with mc5:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">ORT. HACİM</div><div class="metric-value metric-neutral">{hacim/1_000_000:.1f}M</div></div>', unsafe_allow_html=True)
+            if hacim > 0:
+                st.markdown(f'<div class="metric-card"><div class="metric-label">ORT. HACİM</div><div class="metric-value metric-neutral">{hacim/1_000_000:.1f}M</div></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="metric-card"><div class="metric-label">ORT. HACİM</div><div class="metric-value metric-neutral" style="font-size:13px">N/A</div></div>', unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1269,17 +1203,25 @@ with tab1:
 
         with ic1:
             rows = 1; row_heights = [0.6]
-            if goster_vol:        rows += 1; row_heights.append(0.15)
-            if goster_rsi_chart:  rows += 1; row_heights.append(0.125)
-            if goster_macd_chart: rows += 1; row_heights.append(0.125)
+            if goster_vol and hacim > 0:  rows += 1; row_heights.append(0.15)
+            if goster_rsi_chart:          rows += 1; row_heights.append(0.125)
+            if goster_macd_chart:         rows += 1; row_heights.append(0.125)
 
             fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=row_heights)
             cur_row = 1
 
-            if isinstance(data_raw.columns, pd.MultiIndex):
-                high_s = data_raw['High'].iloc[:, 0]; low_s = data_raw['Low'].iloc[:, 0]; open_s = data_raw['Open'].iloc[:, 0]
-            else:
-                high_s = data_raw['High']; low_s = data_raw['Low']; open_s = data_raw['Open']
+            # OHLC sütunlarını çıkar
+            try:
+                if isinstance(data_raw.columns, pd.MultiIndex):
+                    high_s = data_raw['High'].iloc[:, 0]
+                    low_s  = data_raw['Low'].iloc[:, 0]
+                    open_s = data_raw['Open'].iloc[:, 0]
+                else:
+                    high_s = data_raw['High']
+                    low_s  = data_raw['Low']
+                    open_s = data_raw['Open']
+            except:
+                high_s = seri; low_s = seri; open_s = seri
 
             fig.add_trace(go.Candlestick(x=seri.index, open=open_s, high=high_s, low=low_s, close=seri, name=t_kod,
                 increasing=dict(line=dict(color='#00ff88', width=1)), decreasing=dict(line=dict(color='#ff4444', width=1))), row=cur_row, col=1)
@@ -1295,10 +1237,12 @@ with tab1:
                     if len(seri) >= ma_p:
                         fig.add_trace(go.Scatter(x=seri.index, y=seri.rolling(ma_p).mean(), line=dict(color=renk_ma, width=1.5), name=f'MA{ma_p}'), row=cur_row, col=1)
 
-            if goster_vol:
+            if goster_vol and hacim > 0:
                 cur_row += 1
                 try:
                     vol_s = data_raw['Volume'].iloc[:, 0] if isinstance(data_raw.columns, pd.MultiIndex) else data_raw['Volume']
+                    if isinstance(vol_s, pd.DataFrame):
+                        vol_s = vol_s.iloc[:, 0]
                     vol_colors = ['#00ff8888' if c >= o else '#ff444488' for c, o in zip(seri, open_s)]
                     fig.add_trace(go.Bar(x=seri.index, y=vol_s, marker_color=vol_colors, showlegend=False), row=cur_row, col=1)
                 except: pass
@@ -1339,7 +1283,7 @@ with tab1:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<div class="section-title">⚖ PERFORMANS KARŞILAŞTIRMASI (100 TL)</div>', unsafe_allow_html=True)
 
-        indir_list = [f"{t_kod}.IS", "USDTRY=X"]
+        indir_list = ["USDTRY=X"]
         if "Altın (TL)"  in kiyas_secenek: indir_list.append("GC=F")
         if "Gümüş (TL)" in kiyas_secenek: indir_list.append("SI=F")
 
@@ -1352,67 +1296,70 @@ with tab1:
             except:
                 return None
 
-        veriler = indir_coklu(tuple(sorted(set(indir_list))), secilen_periyot)
-        if veriler is not None:
-            if isinstance(veriler, pd.Series):
-                veriler = veriler.to_frame(name=indir_list[0])
-            veriler = veriler.ffill().dropna()
+        veriler_extra = indir_coklu(tuple(sorted(set(indir_list))), secilen_periyot)
 
-            if not veriler.empty and f"{t_kod}.IS" in veriler.columns:
-                fig_k = go.Figure(); ozet = []
-                h_s = veriler[f"{t_kod}.IS"]; norm = (h_s / h_s.iloc[0]) * 100
-                fig_k.add_trace(go.Scatter(x=h_s.index, y=norm, name=f"{t_kod}", line=dict(color='#00d4ff', width=2.5)))
-                ozet.append({"Varlık": f"{t_kod}", "Başlangıç": "100 TL", "Güncel": f"{norm.iloc[-1]:.2f} TL", "Getiri": f"{norm.iloc[-1]-100:+.2f}%"})
-                kur = veriler.get("USDTRY=X", pd.Series(dtype=float))
+        fig_k = go.Figure(); ozet = []
+        # Seçilen hisse (zaten elimizde var)
+        h_s = seri.copy()
+        norm = (h_s / h_s.iloc[0]) * 100
+        fig_k.add_trace(go.Scatter(x=h_s.index, y=norm, name=f"{t_kod}", line=dict(color='#00d4ff', width=2.5)))
+        ozet.append({"Varlık": f"{t_kod} ({veri_kaynagi.upper()})", "Başlangıç": "100 TL", "Güncel": f"{norm.iloc[-1]:.2f} TL", "Getiri": f"{norm.iloc[-1]-100:+.2f}%"})
 
-                if "Altın (TL)" in kiyas_secenek and "GC=F" in veriler.columns and not kur.empty:
-                    a_tl = veriler["GC=F"] * kur; a_norm = (a_tl / a_tl.iloc[0]) * 100
-                    fig_k.add_trace(go.Scatter(x=a_tl.index, y=a_norm, name="Altın (TL)", line=dict(color='#ffd700', width=2)))
-                    ozet.append({"Varlık": "Altın (TL)", "Başlangıç": "100 TL", "Güncel": f"{a_norm.iloc[-1]:.2f} TL", "Getiri": f"{a_norm.iloc[-1]-100:+.2f}%"})
+        if veriler_extra is not None:
+            if isinstance(veriler_extra, pd.Series):
+                veriler_extra = veriler_extra.to_frame()
 
-                if "Gümüş (TL)" in kiyas_secenek and "SI=F" in veriler.columns and not kur.empty:
-                    g_tl = veriler["SI=F"] * kur; g_norm = (g_tl / g_tl.iloc[0]) * 100
-                    fig_k.add_trace(go.Scatter(x=g_tl.index, y=g_norm, name="Gümüş (TL)", line=dict(color='#c0c0c0', width=2)))
-                    ozet.append({"Varlık": "Gümüş (TL)", "Başlangıç": "100 TL", "Güncel": f"{g_norm.iloc[-1]:.2f} TL", "Getiri": f"{g_norm.iloc[-1]-100:+.2f}%"})
+            kur = veriler_extra.get("USDTRY=X", pd.Series(dtype=float)) if isinstance(veriler_extra, pd.DataFrame) else pd.Series(dtype=float)
 
-                if "Dolar/TL" in kiyas_secenek and not kur.empty:
-                    k_norm = (kur / kur.iloc[0]) * 100
-                    fig_k.add_trace(go.Scatter(x=kur.index, y=k_norm, name="Dolar/TL", line=dict(color='#88ff88', width=2)))
-                    ozet.append({"Varlık": "Dolar/TL", "Başlangıç": "100 TL", "Güncel": f"{k_norm.iloc[-1]:.2f} TL", "Getiri": f"{k_norm.iloc[-1]-100:+.2f}%"})
+            if "Altın (TL)" in kiyas_secenek and "GC=F" in (veriler_extra.columns if isinstance(veriler_extra, pd.DataFrame) else []) and not kur.empty:
+                a_tl = veriler_extra["GC=F"] * kur; a_norm = (a_tl / a_tl.iloc[0]) * 100
+                fig_k.add_trace(go.Scatter(x=a_tl.index, y=a_norm, name="Altın (TL)", line=dict(color='#ffd700', width=2)))
+                ozet.append({"Varlık": "Altın (TL)", "Başlangıç": "100 TL", "Güncel": f"{a_norm.iloc[-1]:.2f} TL", "Getiri": f"{a_norm.iloc[-1]-100:+.2f}%"})
 
-                if "Enflasyon" in kiyas_secenek:
-                    enf = {2020:0.14,2021:0.19,2022:0.72,2023:0.65,2024:0.55,2025:0.45,2026:0.35}
-                    cum = [100]; val = 100
-                    for i in range(1, len(veriler.index)):
-                        val *= (1 + enf.get(veriler.index[i].year, 0.45)) ** (1/252); cum.append(val)
-                    fig_k.add_trace(go.Scatter(x=veriler.index, y=cum, name="Enflasyon", line=dict(color='#ff4444', width=1.5, dash='dot')))
-                    ozet.append({"Varlık": "Enflasyon", "Başlangıç": "100 TL", "Güncel": f"{cum[-1]:.2f} TL", "Getiri": f"{cum[-1]-100:+.2f}%"})
+            if "Gümüş (TL)" in kiyas_secenek and "SI=F" in (veriler_extra.columns if isinstance(veriler_extra, pd.DataFrame) else []) and not kur.empty:
+                g_tl = veriler_extra["SI=F"] * kur; g_norm = (g_tl / g_tl.iloc[0]) * 100
+                fig_k.add_trace(go.Scatter(x=g_tl.index, y=g_norm, name="Gümüş (TL)", line=dict(color='#c0c0c0', width=2)))
+                ozet.append({"Varlık": "Gümüş (TL)", "Başlangıç": "100 TL", "Güncel": f"{g_norm.iloc[-1]:.2f} TL", "Getiri": f"{g_norm.iloc[-1]-100:+.2f}%"})
 
-                fig_k.update_layout(title=f"100 TL Yatırımın Performansı — {t_sure_etiket}", template="plotly_dark",
-                    plot_bgcolor='#0a0a0f', paper_bgcolor='#0a0a0f', yaxis_title="Değer (TL)", height=380,
-                    legend=dict(bgcolor='#0f1520', bordercolor='#1e2a3a', font=dict(family='JetBrains Mono', size=11)),
-                    font=dict(family='JetBrains Mono', color='#8899aa'), margin=dict(l=10, r=10, t=40, b=10))
-                fig_k.update_xaxes(gridcolor='#1e2a3a'); fig_k.update_yaxes(gridcolor='#1e2a3a')
-                st.plotly_chart(fig_k, use_container_width=True)
+            if "Dolar/TL" in kiyas_secenek and not kur.empty:
+                k_norm = (kur / kur.iloc[0]) * 100
+                fig_k.add_trace(go.Scatter(x=kur.index, y=k_norm, name="Dolar/TL", line=dict(color='#88ff88', width=2)))
+                ozet.append({"Varlık": "Dolar/TL", "Başlangıç": "100 TL", "Güncel": f"{k_norm.iloc[-1]:.2f} TL", "Getiri": f"{k_norm.iloc[-1]-100:+.2f}%"})
 
-                if len(ozet) > 1:
-                    st.markdown('<div class="section-title">PERFORMANS ÖZETİ</div>', unsafe_allow_html=True)
-                    st.dataframe(pd.DataFrame(ozet), use_container_width=True, hide_index=True)
+        if "Enflasyon" in kiyas_secenek:
+            enf = {2020:0.14,2021:0.19,2022:0.72,2023:0.65,2024:0.55,2025:0.45,2026:0.35}
+            cum = [100]; val = 100
+            for i in range(1, len(h_s)):
+                val *= (1 + enf.get(h_s.index[i].year, 0.45)) ** (1/252); cum.append(val)
+            fig_k.add_trace(go.Scatter(x=h_s.index, y=cum, name="Enflasyon", line=dict(color='#ff4444', width=1.5, dash='dot')))
+            ozet.append({"Varlık": "Enflasyon", "Başlangıç": "100 TL", "Güncel": f"{cum[-1]:.2f} TL", "Getiri": f"{cum[-1]-100:+.2f}%"})
+
+        fig_k.update_layout(title=f"100 TL Yatırımın Performansı — {t_sure_etiket}", template="plotly_dark",
+            plot_bgcolor='#0a0a0f', paper_bgcolor='#0a0a0f', yaxis_title="Değer (TL)", height=380,
+            legend=dict(bgcolor='#0f1520', bordercolor='#1e2a3a', font=dict(family='JetBrains Mono', size=11)),
+            font=dict(family='JetBrains Mono', color='#8899aa'), margin=dict(l=10, r=10, t=40, b=10))
+        fig_k.update_xaxes(gridcolor='#1e2a3a'); fig_k.update_yaxes(gridcolor='#1e2a3a')
+        st.plotly_chart(fig_k, use_container_width=True)
+
+        if len(ozet) > 1:
+            st.markdown('<div class="section-title">PERFORMANS ÖZETİ</div>', unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(ozet), use_container_width=True, hide_index=True)
+
     else:
-        # ✅ DÜZELTME: Daha bilgilendirici hata mesajı
         st.markdown(f"""
         <div style="background:#1a0800;border:1px solid #ff440033;border-left:3px solid #ff4444;
             border-radius:8px;padding:20px;margin:12px 0">
             <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#ff6666;margin-bottom:8px">
-                ⚠ {t_kod} için veri indirilemedi
+                ⚠ {t_kod} için hiçbir veri kaynağından veri alınamadı
             </div>
-            <div style="font-size:12px;color:#6a7d90;line-height:1.8">
-                Bu hisse Yahoo Finance'de mevcut olmayabilir veya farklı bir ticker formatı kullanıyor olabilir.<br>
-                <b style="color:#8899aa">Denenen formatlar:</b> {t_kod}.IS, {t_kod}.E.IS<br><br>
-                💡 Bu genellikle şu durumlarda olur:<br>
-                • Hisse BIST'te aktif işlem görmüyor<br>
-                • Yahoo Finance bu hisseyi henüz desteklemiyor<br>
-                • Hisse yakın zamanda listelenmiş veya delistenmiş
+            <div style="font-size:12px;color:#6a7d90;line-height:1.9">
+                <b style="color:#8899aa">Denenen kaynaklar:</b><br>
+                • Yahoo Finance → <code style="color:#ffaa44">{t_kod}.IS</code>, <code style="color:#ffaa44">{t_kod}.E.IS</code><br>
+                • Stooq → <code style="color:#ffaa44">{t_kod.lower()}.tr</code><br><br>
+                💡 Bu durum genellikle şu sebeplerden kaynaklanır:<br>
+                • Hisse BIST'te aktif işlem görmüyor veya yakın zamanda listelenmiş<br>
+                • Her iki veri kaynağı da bu hisseyi henüz desteklemiyor<br>
+                • Hisse küçük ölçekli olup yeterli işlem hacmi yok
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1422,10 +1369,12 @@ with tab1:
 # ============================================================
 with tab2:
     st.markdown('<div class="section-title">🤖 YAPAY ZEKA ANALİZ RAPORU</div>', unsafe_allow_html=True)
-    data_ai = veri_indir(f"{t_kod}.IS", "1y", "1d")
+    data_ai, kaynak_ai, _ = veri_indir(f"{t_kod}.IS", "1y", "1d")
 
     if data_ai is not None and not data_ai.empty:
         seri_ai = data_ai['Close'].iloc[:, 0].dropna() if isinstance(data_ai.columns, pd.MultiIndex) else data_ai['Close'].dropna()
+        if isinstance(seri_ai, pd.DataFrame):
+            seri_ai = seri_ai.iloc[:, 0]
         fiyat_ai = float(seri_ai.iloc[-1])
         fiyat_prev_ai = float(seri_ai.iloc[-2]) if len(seri_ai) > 1 else fiyat_ai
         degisim_ai = ((fiyat_ai - fiyat_prev_ai) / fiyat_prev_ai) * 100
@@ -1447,6 +1396,10 @@ with tab2:
             <div class="metric-card" style="margin-top:8px">
                 <div class="metric-label">TEKNİK SİNYAL</div>
                 <div class="metric-value" style="font-size:16px;color:{'#00ff88' if 'AL' in gs_ai else ('#ff4444' if 'SAT' in gs_ai else '#ffaa00')}">{gs_ai}</div>
+            </div>
+            <div class="metric-card" style="margin-top:8px">
+                <div class="metric-label">VERİ KAYNAĞI</div>
+                <div style="margin-top:6px">{kaynak_rozeti(kaynak_ai)}</div>
             </div>""", unsafe_allow_html=True)
 
         with ai_kol1:
@@ -1480,7 +1433,7 @@ with tab2:
         fig_ai.update_xaxes(gridcolor='#1e2a3a'); fig_ai.update_yaxes(gridcolor='#1e2a3a')
         st.plotly_chart(fig_ai, use_container_width=True)
     else:
-        st.warning(f"⚠ {t_kod} için veri yüklenemedi.")
+        st.warning(f"⚠ {t_kod} için veri yüklenemedi (Yahoo Finance ve Stooq denendi).")
 
 # ============================================================
 # TAB 3: HABERLER
@@ -1567,7 +1520,7 @@ with tab3:
         endeksler = {"BIST 100": "XU100.IS", "Dolar/TL": "USDTRY=X", "Euro/TL": "EURTRY=X", "Altın (TL)": "GC=F"}
         for ad, ticker_k in endeksler.items():
             try:
-                d = yf.download(ticker_k, period="2d", progress=False)
+                d = yf.download(ticker_k, period="2d", progress=False, auto_adjust=True)
                 if not d.empty and len(d) >= 2:
                     son  = float(d['Close'].iloc[-1].iloc[0]) if isinstance(d.columns, pd.MultiIndex) else float(d['Close'].iloc[-1])
                     prev = float(d['Close'].iloc[-2].iloc[0]) if isinstance(d.columns, pd.MultiIndex) else float(d['Close'].iloc[-2])
@@ -1614,17 +1567,16 @@ with tab4:
                 t_maliyet = 0.0; t_guncel = 0.0; portfoy_data = []
                 for _, row in st.session_state.portfoy.iterrows():
                     try:
-                        # ✅ DÜZELTME: portföyde de çoklu format deneme
-                        g_veri, kullanilan_ticker = tek_fiyat_indir(row['Hisse'])
+                        g_veri, kullanilan_t, kaynak_p = tek_fiyat_indir(row['Hisse'])
                         if g_veri is None or g_veri.empty: continue
-                        
+
                         if isinstance(g_veri.columns, pd.MultiIndex):
                             g_fiyat = float(g_veri['Close'].iloc[-1].iloc[0])
                             g_prev  = float(g_veri['Close'].iloc[-2].iloc[0]) if len(g_veri) > 1 else g_fiyat
                         else:
                             g_fiyat = float(g_veri['Close'].iloc[-1])
                             g_prev  = float(g_veri['Close'].iloc[-2]) if len(g_veri) > 1 else g_fiyat
-                        
+
                         m_toplam = float(row['Maliyet']) * int(row['Adet'])
                         g_toplam = g_fiyat * int(row['Adet'])
                         kz_tl    = g_toplam - m_toplam
@@ -1637,7 +1589,8 @@ with tab4:
                         portfoy_data.append({'row_id': row['id'], 'hisse': row['Hisse'], 'maliyet': row['Maliyet'], 'adet': row['Adet'],
                             'g_fiyat': g_fiyat, 'm_toplam': m_toplam, 'g_toplam': g_toplam,
                             'kz_tl': kz_tl, 'kz_yuzde': kz_yuzde, 'gun_deg': gun_deg,
-                            'hedef_uyari': hedef_uyari, 'stop_uyari': stop_uyari})
+                            'hedef_uyari': hedef_uyari, 'stop_uyari': stop_uyari,
+                            'kaynak': kaynak_p or 'unknown'})
                     except:
                         pass
 
@@ -1645,6 +1598,7 @@ with tab4:
                     kz_renk = '#00ff88' if p['kz_tl'] >= 0 else '#ff4444'
                     gun_renk = '#00ff88' if p['gun_deg'] >= 0 else '#ff4444'
                     gun_yon  = '▲' if p['gun_deg'] >= 0 else '▼'
+                    rozet = kaynak_rozeti(p['kaynak'])
                     r1, r2 = st.columns([5, 1])
                     with r1:
                         st.markdown(f"""<div class="metric-card">
@@ -1652,6 +1606,7 @@ with tab4:
                                 <div>
                                     <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#00d4ff">{p['hisse']}</span>
                                     <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4a6080;margin-left:8px">{p['adet']} adet @ {float(p['maliyet']):.2f}</span>
+                                    {rozet}
                                 </div>
                                 <div style="text-align:right">
                                     <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#e2e8f0;font-weight:600">{p['g_fiyat']:.2f} TL</div>
@@ -1699,12 +1654,6 @@ with tab4:
                 </div>""", unsafe_allow_html=True)
 
 # ============================================================
-# TAB 5: SOSYAL MEDYA (Twitter/X) — DÜZELTİLMİŞ
-# ============================================================
-with tab5:
-    twitter_sosyal_medya_bolumu(t_kod, t_ad)
-
-# ============================================================
 # FOOTER
 # ============================================================
 st.markdown("---")
@@ -1713,10 +1662,10 @@ st.markdown(f"""
     <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ffaa00;letter-spacing:2px;margin-bottom:8px">⚠ YASAL UYARI / SORUMLULUK REDDİ</div>
     <div style="font-size:12px;color:#6a7d90;line-height:1.8">
         Bu uygulama <b style="color:#8899aa">yalnızca bilgilendirme amaçlıdır</b> ve <b style="color:#8899aa">yatırım tavsiyesi niteliği taşımamaktadır.</b>
-        Veriler Yahoo Finance kaynaklıdır; gerçek zamanlı olmayabilir. Yatırım kararlarınızı vermeden önce lisanslı bir danışmana başvurun.
+        Veriler Yahoo Finance ve Stooq kaynaklıdır; gerçek zamanlı olmayabilir. Yatırım kararlarınızı vermeden önce lisanslı bir danışmana başvurun.
     </div>
 </div>
 <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#2a3a4a;padding:8px">
-    BIST TERMINAL PRO &nbsp;•&nbsp; Geliştirici: Enes Boz &nbsp;•&nbsp; {datetime.now().year} &nbsp;•&nbsp; Veriler Yahoo Finance kaynaklıdır
+    BIST TERMINAL PRO &nbsp;•&nbsp; Geliştirici: Enes Boz &nbsp;•&nbsp; {datetime.now().year} &nbsp;•&nbsp; Veriler: Yahoo Finance + Stooq
 </div>
 """, unsafe_allow_html=True)
